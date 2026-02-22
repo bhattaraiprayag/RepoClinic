@@ -67,6 +67,52 @@ class FeatureFlagsConfig(StrictSchemaModel):
     enable_osv: bool = True
 
 
+class AnalysisControlsConfig(StrictSchemaModel):
+    """Controls for analysis-context shaping before branch execution."""
+
+    enable_context_compaction: bool = True
+    context_compaction_retry_attempts: int = Field(default=1, ge=0, le=3)
+    max_evidence_total: int = Field(default=300, ge=10)
+    max_evidence_per_source: dict[str, int] = Field(
+        default_factory=lambda: {
+            "bandit": 120,
+            "semgrep": 120,
+            "osv": 120,
+            "scanner_heuristic": 80,
+        }
+    )
+    max_dependency_findings: int = Field(default=60, ge=1)
+
+
+class BanditScannerConfig(StrictSchemaModel):
+    """Bandit scanner command controls."""
+
+    exclude_paths: list[str] = Field(
+        default_factory=lambda: [
+            ".git",
+            "node_modules",
+            "dist",
+            ".venv",
+            "__pycache__",
+            "tests/fixtures",
+        ]
+    )
+
+
+class OsvScannerConfig(StrictSchemaModel):
+    """OSV scanner command controls."""
+
+    no_ignore: bool = True
+    fallback_lockfile_scan: bool = True
+
+
+class SecurityScannersConfig(StrictSchemaModel):
+    """Security scanner tool controls."""
+
+    bandit: BanditScannerConfig = Field(default_factory=BanditScannerConfig)
+    osv: OsvScannerConfig = Field(default_factory=OsvScannerConfig)
+
+
 class TokenBudgetConfig(StrictSchemaModel):
     """Per-stage token budgets."""
 
@@ -113,6 +159,12 @@ class AppConfig(StrictSchemaModel):
     timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
     token_budgets: TokenBudgetConfig = Field(default_factory=TokenBudgetConfig)
     feature_flags: FeatureFlagsConfig = Field(default_factory=FeatureFlagsConfig)
+    analysis_controls: AnalysisControlsConfig = Field(
+        default_factory=AnalysisControlsConfig
+    )
+    security_scanners: SecurityScannersConfig = Field(
+        default_factory=SecurityScannersConfig
+    )
     scan_policy: ScanPolicyConfig = Field(default_factory=ScanPolicyConfig)
 
     @model_validator(mode="after")

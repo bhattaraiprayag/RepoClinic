@@ -10,9 +10,13 @@ import orjson
 from crewai import Agent, Crew, Process, Task
 from pydantic import BaseModel, Field
 
+from repoclinic.agents.context_compactor import (
+    compact_scanner_context,
+    minimal_scanner_context,
+)
 from repoclinic.config.model_factory import ModelFactory
 from repoclinic.config.models import AppConfig
-from repoclinic.config.token_budget import TokenBudgeter
+from repoclinic.config.token_budget import TokenBudgetExceededError, TokenBudgeter
 from repoclinic.schemas.analysis_models import (
     ArchitectureAgentOutput,
     BaseFinding,
@@ -561,8 +565,30 @@ class CrewBranchExecutor:
         context = orjson.dumps(scanner_payload, option=orjson.OPT_SORT_KEYS).decode(
             "utf-8"
         )
-        self._token_budgeter.ensure_within_budget(context, budget)
-        return context
+        try:
+            self._token_budgeter.ensure_within_budget(context, budget)
+            return context
+        except TokenBudgetExceededError:
+            controls = self.config.analysis_controls
+            if (
+                not controls.enable_context_compaction
+                or controls.context_compaction_retry_attempts <= 0
+            ):
+                raise
+
+        compacted_payload, _stats = compact_scanner_context(scanner_output, controls)
+        compacted_context = orjson.dumps(
+            compacted_payload, option=orjson.OPT_SORT_KEYS
+        ).decode("utf-8")
+        try:
+            self._token_budgeter.ensure_within_budget(compacted_context, budget)
+            return compacted_context
+        except TokenBudgetExceededError:
+            minimal_context = orjson.dumps(
+                minimal_scanner_context(scanner_output), option=orjson.OPT_SORT_KEYS
+            ).decode("utf-8")
+            self._token_budgeter.ensure_within_budget(minimal_context, budget)
+            return minimal_context
 
     @staticmethod
     def _normalize_output_metadata(

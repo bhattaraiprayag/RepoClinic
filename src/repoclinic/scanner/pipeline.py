@@ -46,7 +46,9 @@ class ScannerPipeline:
         db_path: Path | None = None,
     ) -> None:
         self.config = config
-        self.workspace_root = workspace_root or Path(".scanner-workspace")
+        self.workspace_root = (
+            (workspace_root or Path("scanner-workspace")).expanduser().resolve()
+        )
         self.persistence = ScannerPersistence(db_path or Path(".sqlite/repoclinic.db"))
         self.resolver = SourceResolver(self.workspace_root)
 
@@ -73,7 +75,10 @@ class ScannerPipeline:
         scanner_tool_runs: list[ScannerToolRun] = []
 
         tool_runners = ToolRunners(
-            timeout_seconds=request.execution.timeouts.scanner_seconds
+            timeout_seconds=request.execution.timeouts.scanner_seconds,
+            bandit_excludes=self.config.security_scanners.bandit.exclude_paths,
+            osv_no_ignore=self.config.security_scanners.osv.no_ignore,
+            osv_fallback_lockfile_scan=self.config.security_scanners.osv.fallback_lockfile_scan,
         )
         dependency_tool_statuses: list[str] = []
 
@@ -99,7 +104,10 @@ class ScannerPipeline:
             request.execution.feature_flags.enable_osv,
             self.config.feature_flags.enable_osv,
         ):
-            osv_result = tool_runners.run_osv(resolved.resolved_path)
+            osv_result = tool_runners.run_osv(
+                resolved.resolved_path,
+                lockfiles=[str(path) for path in inventory.osv_lockfiles],
+            )
             scanner_tool_runs.append(_to_tool_run("osv-scanner", osv_result))
             dependency_tool_statuses.append(osv_result.status)
             if osv_result.status == "completed":

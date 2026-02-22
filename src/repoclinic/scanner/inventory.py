@@ -30,6 +30,17 @@ MANIFEST_FILES = {
     "Cargo.toml",
     "go.mod",
 }
+OSV_LOCKFILE_FILES = {
+    "uv.lock",
+    "poetry.lock",
+    "Pipfile.lock",
+    "requirements.txt",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "Cargo.lock",
+    "go.sum",
+}
 
 
 @dataclass(frozen=True)
@@ -49,6 +60,7 @@ class InventoryResult:
 
     files: list[FileRecord]
     manifests: list[Path]
+    osv_lockfiles: list[Path]
     top_level_dirs: list[str]
     stats: ScanStats
 
@@ -65,12 +77,15 @@ class InventoryEngine:
         stats = ScanStats()
         records: list[FileRecord] = []
         manifests: list[Path] = []
+        lockfiles: set[Path] = set()
         top_level_dirs: set[str] = set()
 
         for rel in file_paths:
             if len(records) >= self.scan_policy.max_files:
                 break
             stats.total_files_seen += 1
+            if rel.name in OSV_LOCKFILE_FILES:
+                lockfiles.add(rel)
             if self.policy.should_skip(rel):
                 stats.files_skipped += 1
                 stats.skipped_reasons.ignored_pathspec += 1
@@ -121,6 +136,7 @@ class InventoryEngine:
         return InventoryResult(
             files=records,
             manifests=manifests,
+            osv_lockfiles=sorted(lockfiles),
             top_level_dirs=sorted(top_level_dirs),
             stats=stats,
         )

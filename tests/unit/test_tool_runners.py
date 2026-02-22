@@ -21,11 +21,13 @@ def test_bandit_command_uses_quiet_and_excludes(monkeypatch) -> None:  # type: i
         cmd: list[str],
         success_codes: set[int],
         unavailable_codes: set[int] | None = None,
+        cwd: Path | None = None,
     ) -> ToolRunResult:
         captured["tool_name"] = tool_name
         captured["cmd"] = cmd
         captured["success_codes"] = success_codes
         captured["unavailable_codes"] = unavailable_codes
+        captured["cwd"] = cwd
         return ToolRunResult(status="completed", payload={})
 
     monkeypatch.setattr(ToolRunners, "_run_json_command", _fake_run_json_command)
@@ -36,6 +38,37 @@ def test_bandit_command_uses_quiet_and_excludes(monkeypatch) -> None:  # type: i
     assert isinstance(cmd, list)
     assert "-q" in cmd
     assert "-x" in cmd
+    exclude_arg = cmd[cmd.index("-x") + 1]
+    assert ".scanner-workspace" not in exclude_arg
+    assert captured["cwd"] == Path("/tmp/repo")
+
+
+def test_osv_command_uses_no_ignore_by_default(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """OSV command should include --no-ignore to avoid hidden-path dropouts."""
+    captured: dict[str, object] = {}
+
+    def _fake_run_json_command(
+        self,  # noqa: ANN001
+        *,
+        tool_name: str,
+        cmd: list[str],
+        success_codes: set[int],
+        unavailable_codes: set[int] | None = None,
+        cwd: Path | None = None,
+    ) -> ToolRunResult:
+        captured["tool_name"] = tool_name
+        captured["cmd"] = cmd
+        captured["cwd"] = cwd
+        return ToolRunResult(status="completed", payload={})
+
+    monkeypatch.setattr(ToolRunners, "_run_json_command", _fake_run_json_command)
+    ToolRunners(timeout_seconds=10).run_osv(Path("/tmp/repo"))
+
+    assert captured["tool_name"] == "osv-scanner"
+    cmd = captured["cmd"]
+    assert isinstance(cmd, list)
+    assert "--no-ignore" in cmd
+    assert captured["cwd"] == Path("/tmp/repo")
 
 
 def test_osv_exit_code_128_maps_to_unavailable(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -68,3 +101,59 @@ def test_dependency_status_prioritizes_completed() -> None:
     assert _resolve_dependency_status(["unavailable"]) == "unavailable"
     assert _resolve_dependency_status(["failed"]) == "failed"
     assert _resolve_dependency_status(["completed", "failed"]) == "completed"
+
+
+def test_normalize_lockfiles_keeps_existing_relative_paths(tmp_path: Path) -> None:
+    """Lockfile normalization should keep in-repo files and ignore external ones."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "uv.lock").write_text("content", encoding="utf-8")
+    outside = tmp_path / "outside.lock"
+    outside.write_text("x", encoding="utf-8")
+
+    normalized = ToolRunners._normalize_lockfiles(
+        repo,
+        [
+            "uv.lock",
+            str((repo / "uv.lock").resolve()),
+            str(outside.resolve()),
+            "missing.lock",
+        ],
+    )
+    assert normalized == ["uv.lock"]
+
+
+def test_osv_falls_back_to_lockfile_scan(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """OSV should retry with explicit lockfiles when recursive source scan is unavailable."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    lockfile = repo / "uv.lock"
+    lockfile.write_text("content", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def _fake_run_json_command(
+        self,  # noqa: ANN001
+        *,
+        tool_name: str,
+        cmd: list[str],
+        success_codes: set[int],
+        unavailable_codes: set[int] | None = None,
+        cwd: Path | None = None,
+    ) -> ToolRunResult:
+        del self, tool_name, success_codes, unavailable_codes, cwd
+        calls.append(cmd)
+        if "-r" in cmd:
+            return ToolRunResult(
+                status="unavailable", payload={}, error="no package sources"
+            )
+        return ToolRunResult(status="completed", payload={"results": []}, exit_code=0)
+
+    monkeypatch.setattr(ToolRunners, "_run_json_command", _fake_run_json_command)
+    result = ToolRunners(timeout_seconds=10).run_osv(
+        repo,
+        lockfiles=["uv.lock", str(lockfile.resolve())],
+    )
+
+    assert result.status == "completed"
+    assert len(calls) == 2
+    assert "-L" in calls[1]

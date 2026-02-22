@@ -498,7 +498,9 @@ class RepoClinicFlowRunner:
             self.env = env
         self.config = load_app_config(config_path, env=self.env)
         self.db_path = db_path or Path(".sqlite/repoclinic.db")
-        self.workspace_root = workspace_root or Path(".scanner-workspace")
+        self.workspace_root = (
+            (workspace_root or Path("scanner-workspace")).expanduser().resolve()
+        )
         self.manifest_store = RunManifestStore(self.db_path)
         self.manifest_collector = RunManifestCollector(
             workspace_root=self.workspace_root

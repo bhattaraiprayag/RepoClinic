@@ -12,8 +12,8 @@ RepoClinic is a scanner-first repository analysis CLI built with CrewAI flow orc
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
 - Git
-- ripgrep (`rg`)
-- Go 1.25.7+ (required when installing `osv-scanner` from source)
+- [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`)
+- [Go](https://go.dev/doc/install) 1.25.7+ (required when installing `osv-scanner` from source)
 - Docker (optional, for containerized runs)
 
 ### Install and bootstrap

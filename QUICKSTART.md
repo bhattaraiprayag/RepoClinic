@@ -8,6 +8,7 @@
 - [Go](https://go.dev/doc/install) 1.25.7+ (required when installing `osv-scanner` from source)
 - Docker (for container workflows)
 - Git
+- [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`)
 
 ## 2) Initial setup (without Makefile)
 

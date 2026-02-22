@@ -101,7 +101,7 @@ def analyze(
         Path(".sqlite/repoclinic.db"), "--db-path", help="SQLite path for flow state."
     ),
     workspace_root: Path = typer.Option(
-        Path(".scanner-workspace"),
+        Path("scanner-workspace"),
         "--workspace-root",
         help="Workspace root for cloned repos.",
     ),
@@ -168,7 +168,7 @@ def resume(
         Path(".sqlite/repoclinic.db"), "--db-path", help="SQLite path for flow state."
     ),
     workspace_root: Path = typer.Option(
-        Path(".scanner-workspace"),
+        Path("scanner-workspace"),
         "--workspace-root",
         help="Workspace root for cloned repos.",
     ),

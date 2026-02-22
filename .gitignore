@@ -17,3 +17,4 @@ wheels/
 .env
 .pre-commit-cache/
 .scanner-workspace/
+scanner-workspace/

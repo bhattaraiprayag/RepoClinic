@@ -25,7 +25,7 @@ class SourceResolver:
     """Resolve incoming source into a local directory."""
 
     def __init__(self, workspace_root: Path) -> None:
-        self.workspace_root = workspace_root
+        self.workspace_root = workspace_root.expanduser().resolve()
         self.workspace_root.mkdir(parents=True, exist_ok=True)
 
     def resolve(self, source: AnalyzeInput, run_id: str) -> ResolvedSource:
@@ -43,7 +43,7 @@ class SourceResolver:
 
         assert source.github_url is not None
         repo_name = self._extract_repo_name(source.github_url)
-        destination = self.workspace_root / f"{repo_name}-{run_id}"
+        destination = (self.workspace_root / f"{repo_name}-{run_id}").resolve()
         if destination.exists():
             return ResolvedSource(
                 repo_name=repo_name,

@@ -44,6 +44,28 @@ feature_flags:
   enable_bandit: true
   enable_semgrep: true
   enable_osv: true
+analysis_controls:
+  enable_context_compaction: true
+  context_compaction_retry_attempts: 1
+  max_evidence_total: 300
+  max_evidence_per_source:
+    bandit: 120
+    semgrep: 120
+    osv: 120
+    scanner_heuristic: 80
+  max_dependency_findings: 60
+security_scanners:
+  bandit:
+    exclude_paths:
+      - ".git"
+      - "node_modules"
+      - "dist"
+      - ".venv"
+      - "__pycache__"
+      - "tests/fixtures"
+  osv:
+    no_ignore: true
+    fallback_lockfile_scan: true
 scan_policy:
   include_globs:
     - "**/*"
