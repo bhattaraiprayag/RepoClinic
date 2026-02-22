@@ -36,7 +36,7 @@ jobs:
         run: uv sync --all-groups
 
       - name: Verify scanner tooling
-        run: semgrep --version && bandit --version && osv-scanner --version
+        run: uv run semgrep --version && uv run bandit --version && osv-scanner --version
 
       - name: Provide runtime env template
         run: cp .env.example .env
