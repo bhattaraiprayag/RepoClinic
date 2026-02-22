@@ -32,6 +32,7 @@ def apply_overrides(
     env_default_profile = env.get("REPOCLINIC_DEFAULT_PROVIDER_PROFILE")
     if env_default_profile:
         merged["default_provider_profile"] = env_default_profile
+    _apply_lmstudio_env_overrides(merged, env)
 
     if cli_overrides:
         if cli_overrides.get("default_provider_profile"):
@@ -42,6 +43,24 @@ def apply_overrides(
     return merged
 
 
+def _apply_lmstudio_env_overrides(
+    merged: dict[str, Any],
+    env: Mapping[str, str],
+) -> None:
+    profiles = merged.get("provider_profiles")
+    if not isinstance(profiles, dict):
+        return
+    lm_profile = profiles.get("lm-studio-default")
+    if not isinstance(lm_profile, dict):
+        return
+    if env.get("LM_STUDIO_BASE_URL"):
+        lm_profile["base_url"] = env["LM_STUDIO_BASE_URL"]
+    if env.get("LM_STUDIO_MODEL"):
+        lm_profile["model"] = env["LM_STUDIO_MODEL"]
+    if env.get("LM_STUDIO_API_KEY_ENV"):
+        lm_profile["api_key_env"] = env["LM_STUDIO_API_KEY_ENV"]
+
+
 def load_app_config(
     config_path: Path | None = None,
     *,
@@ -49,7 +68,7 @@ def load_app_config(
     cli_overrides: Mapping[str, Any] | None = None,
 ) -> AppConfig:
     """Load and validate central application config."""
-    active_env = env or os.environ
+    active_env = os.environ if env is None else env
     raw = _load_yaml(config_path or DEFAULT_CONFIG_PATH)
     merged = apply_overrides(raw, active_env, cli_overrides)
     return AppConfig.model_validate(merged)

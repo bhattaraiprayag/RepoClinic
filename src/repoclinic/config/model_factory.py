@@ -47,7 +47,11 @@ class ModelFactory:
         elif profile.provider_type == ProviderType.LM_STUDIO:
             if not base_url:
                 raise ValueError("LM Studio profile must define base_url")
-            api_key = env.get(profile.api_key_env or "", "lm-studio")
+            assert profile.api_key_env is not None
+            api_key = env.get(profile.api_key_env)
+            if not api_key:
+                raise ValueError(f"Missing LM Studio auth env var: {profile.api_key_env}")
+            base_url = _normalize_lmstudio_base_url(base_url)
 
         return LLM(
             model=profile.model,
@@ -58,3 +62,10 @@ class ModelFactory:
             api_key=api_key,
             base_url=base_url,
         )
+
+
+def _normalize_lmstudio_base_url(base_url: str) -> str:
+    normalized = base_url.rstrip("/")
+    if normalized.endswith("/chat/completions"):
+        normalized = normalized[: -len("/chat/completions")]
+    return normalized

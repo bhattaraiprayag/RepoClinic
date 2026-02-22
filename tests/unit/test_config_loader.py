@@ -33,6 +33,7 @@ provider_profiles:
   lm-studio-default:
     provider_type: "lm_studio"
     model: "openai/local"
+    api_key_env: "LM_STUDIO_AUTH_TOKEN"
     base_url: "http://127.0.0.1:1234/v1"
     max_tokens: 1024
     capabilities:
@@ -59,6 +60,7 @@ provider_profiles:
   lm-studio-default:
     provider_type: "lm_studio"
     model: "openai/local"
+    api_key_env: "LM_STUDIO_AUTH_TOKEN"
     max_tokens: 1024
     capabilities:
       context_window: 16384
@@ -66,4 +68,34 @@ provider_profiles:
     )
 
     with pytest.raises(ValueError):
-        load_app_config(config_path)
+        load_app_config(config_path, env={})
+
+
+def test_lmstudio_env_overrides_apply(tmp_path: Path) -> None:
+    """LM Studio base URL and model should be overrideable via env."""
+    config_path = _write_config(
+        tmp_path,
+        """
+schema_version: "1.0.0"
+default_provider_profile: "lm-studio-default"
+provider_profiles:
+  lm-studio-default:
+    provider_type: "lm_studio"
+    model: "default-model"
+    api_key_env: "LM_STUDIO_AUTH_TOKEN"
+    base_url: "http://127.0.0.1:1234/v1"
+    max_tokens: 1024
+    capabilities:
+      context_window: 16384
+""".strip(),
+    )
+    config = load_app_config(
+        config_path,
+        env={
+            "LM_STUDIO_BASE_URL": "http://192.168.1.70:1234/v1",
+            "LM_STUDIO_MODEL": "qwen/qwen3-vl-30b",
+        },
+    )
+    profile = config.provider_profiles["lm-studio-default"]
+    assert profile.base_url == "http://192.168.1.70:1234/v1"
+    assert profile.model == "qwen/qwen3-vl-30b"

@@ -46,8 +46,11 @@ class ProviderProfile(StrictSchemaModel):
     def validate_provider_requirements(self) -> "ProviderProfile":
         if self.provider_type == ProviderType.OPENAI and not self.api_key_env:
             raise ValueError("OpenAI profiles must define api_key_env")
-        if self.provider_type == ProviderType.LM_STUDIO and not self.base_url:
-            raise ValueError("LM Studio profiles must define base_url")
+        if self.provider_type == ProviderType.LM_STUDIO:
+            if not self.base_url:
+                raise ValueError("LM Studio profiles must define base_url")
+            if not self.api_key_env:
+                raise ValueError("LM Studio profiles must define api_key_env")
         if self.max_tokens > self.capabilities.context_window:
             raise ValueError("max_tokens cannot exceed provider context_window")
         return self

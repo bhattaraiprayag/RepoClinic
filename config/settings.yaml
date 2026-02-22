@@ -15,7 +15,8 @@ provider_profiles:
       retries: 3
   lm-studio-default:
     provider_type: "lm_studio"
-    model: "qwen3-next-80b-a3b-thinking-mlx"
+    model: "qwen/qwen3-vl-30b"
+    api_key_env: "LM_STUDIO_AUTH_TOKEN"
     base_url: "http://192.168.1.70:1234/v1"
     temperature: 0.1
     seed: 42
