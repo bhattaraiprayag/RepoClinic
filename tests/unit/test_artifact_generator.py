@@ -32,6 +32,7 @@ from repoclinic.schemas.scanner_models import (
     RepoProfile,
     ScanStats,
     ScannerOutput,
+    ScannerToolRun,
 )
 
 
@@ -50,6 +51,15 @@ def _scanner_output() -> ScannerOutput:
         scan_stats=ScanStats(total_files_seen=12, files_scanned=10, files_skipped=2),
         dependency_summary=DependencySummary(vulnerability_scan_status="completed"),
         evidence_index=[],
+        scanner_tool_runs=[
+            ScannerToolRun(tool="semgrep", status="completed"),
+            ScannerToolRun(
+                tool="osv-scanner",
+                status="unavailable",
+                exit_code=128,
+                details="no packages found",
+            ),
+        ],
     )
 
 
@@ -200,10 +210,14 @@ def test_summary_json_required_keys_and_sorting() -> None:
         "top_security_risks",
         "top_performance_risks",
         "roadmap",
+        "scanner_tooling",
         "analysis_status",
     }
     assert payload["top_security_risks"][0]["severity"] == "High"
     assert payload["roadmap"][0]["priority"] == "P0"
+    assert any(
+        item["status"] == "tooling_unavailable" for item in payload["scanner_tooling"]
+    )
 
 
 def test_report_section_order_is_fixed() -> None:

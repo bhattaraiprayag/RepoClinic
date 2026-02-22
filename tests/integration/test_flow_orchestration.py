@@ -25,6 +25,7 @@ from repoclinic.schemas.input_models import (
     ProviderConfig,
     TimeoutConfig,
 )
+from repoclinic.schemas.output_models import RoadmapItem
 from repoclinic.schemas.scanner_models import (
     DependencySummary,
     EvidenceItem,
@@ -48,7 +49,7 @@ class _FakeBranchExecutor(BranchExecutor):
     def __init__(self, *, fail_security: bool = False) -> None:
         self.impl = HeuristicBranchExecutor()
         self.fail_security = fail_security
-        self.calls = {"architecture": 0, "security": 0, "performance": 0}
+        self.calls = {"architecture": 0, "security": 0, "performance": 0, "roadmap": 0}
 
     def run_architecture(
         self, scanner_output: ScannerOutput
@@ -65,6 +66,19 @@ class _FakeBranchExecutor(BranchExecutor):
     def run_performance(self, scanner_output: ScannerOutput) -> PerformanceAgentOutput:
         self.calls["performance"] += 1
         return self.impl.run_performance(scanner_output)
+
+    def run_roadmap(
+        self,
+        architecture_output: ArchitectureAgentOutput,
+        security_output: SecurityAgentOutput,
+        performance_output: PerformanceAgentOutput,
+    ) -> list[RoadmapItem]:
+        self.calls["roadmap"] += 1
+        return self.impl.run_roadmap(
+            architecture_output=architecture_output,
+            security_output=security_output,
+            performance_output=performance_output,
+        )
 
 
 def _build_config() -> AppConfig:
@@ -188,7 +202,12 @@ def test_flow_fan_out_fan_in_and_transition_log(tmp_path: Path) -> None:
     assert flow.state.branch_statuses["performance"] == "completed"
     assert flow.state.branch_statuses["roadmap"] == "completed"
     assert scanner_pipeline.calls == 1
-    assert branch_executor.calls == {"architecture": 1, "security": 1, "performance": 1}
+    assert branch_executor.calls == {
+        "architecture": 1,
+        "security": 1,
+        "performance": 1,
+        "roadmap": 1,
+    }
 
     transitions = transition_store.list_transitions(run_id)
     node_names = [entry[0] for entry in transitions]
@@ -283,5 +302,10 @@ def test_flow_resume_uses_idempotency_guards(tmp_path: Path) -> None:
     resumed_flow.kickoff(inputs={"id": run_id})
 
     assert scanner_pipeline.calls == 1
-    assert branch_executor.calls == {"architecture": 1, "security": 1, "performance": 1}
+    assert branch_executor.calls == {
+        "architecture": 1,
+        "security": 1,
+        "performance": 1,
+        "roadmap": 1,
+    }
     assert resumed_flow.state.completed_nodes

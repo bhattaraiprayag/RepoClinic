@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from repoclinic.agents.executor import HeuristicBranchExecutor, synthesize_roadmap
+from repoclinic.agents.executor import HeuristicBranchExecutor
 from repoclinic.schemas.analysis_models import BaseFinding
 from repoclinic.schemas.enums import FindingStatus
 from repoclinic.schemas.scanner_models import (
@@ -91,6 +91,14 @@ def test_heuristic_branch_outputs_are_schema_valid() -> None:
     assert _confirmed_findings_have_evidence(architecture.findings)
     assert _confirmed_findings_have_evidence(security.findings)
     assert _confirmed_findings_have_evidence(performance.findings)
+    security_titles = {finding.title for finding in security.findings}
+    assert "Hardcoded secrets review" in security_titles
+    assert "Input validation coverage review" in security_titles
+    assert "Dependency vulnerability review" in security_titles
+    performance_titles = {finding.title for finding in performance.findings}
+    assert "N+1 query pattern review" in performance_titles
+    assert "API pagination review" in performance_titles
+    assert "Loop and file I/O hotspot review" in performance_titles
 
 
 def test_roadmap_synthesis_prioritizes_actionable_findings() -> None:
@@ -101,7 +109,7 @@ def test_roadmap_synthesis_prioritizes_actionable_findings() -> None:
     security = executor.run_security(scanner_output)
     performance = executor.run_performance(scanner_output)
 
-    roadmap = synthesize_roadmap(
+    roadmap = executor.run_roadmap(
         architecture_output=architecture,
         security_output=security,
         performance_output=performance,

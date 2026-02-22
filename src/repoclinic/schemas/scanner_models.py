@@ -28,6 +28,7 @@ ScannerEvidenceSource = Literal[
     "tree_sitter",
     "scanner_heuristic",
 ]
+ToolExecutionStatus = Literal["completed", "failed", "unavailable"]
 
 
 class SkipReasons(StrictSchemaModel):
@@ -101,6 +102,15 @@ class DependencySummary(StrictSchemaModel):
     vulnerability_findings: list[DependencyFinding] = Field(default_factory=list)
 
 
+class ScannerToolRun(StrictSchemaModel):
+    """Execution status for an external scanner tool."""
+
+    tool: str = Field(min_length=1)
+    status: ToolExecutionStatus
+    exit_code: int | None = None
+    details: str | None = None
+
+
 class RepoProfile(StrictSchemaModel):
     """High-level repository profile discovered by scanner."""
 
@@ -120,3 +130,4 @@ class ScannerOutput(VersionedRunModel):
     folders: list[FolderSummary] = Field(default_factory=list)
     dependency_summary: DependencySummary = Field(default_factory=DependencySummary)
     evidence_index: list[EvidenceItem] = Field(default_factory=list)
+    scanner_tool_runs: list[ScannerToolRun] = Field(default_factory=list)

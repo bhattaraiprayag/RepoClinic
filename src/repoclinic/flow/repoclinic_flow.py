@@ -365,15 +365,31 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             performance_output = PerformanceAgentOutput.model_validate(
                 self.state.performance_output or {}
             )
-            roadmap_items = synthesize_roadmap(
-                architecture_output=architecture_output,
-                security_output=security_output,
-                performance_output=performance_output,
-            )
+            roadmap_agent_error: str | None = None
+            try:
+                roadmap_items = self.retry_executor.run(
+                    lambda: self.branch_executor.run_roadmap(
+                        architecture_output,
+                        security_output,
+                        performance_output,
+                    ),
+                    stage_name="roadmap-planner-branch",
+                    timeout_seconds=self.config.timeouts.agent_seconds,
+                )
+            except Exception as exc:
+                roadmap_agent_error = redact_text(str(exc))
+                self.state.branch_failures["roadmap_agent"] = roadmap_agent_error
+                roadmap_items = synthesize_roadmap(
+                    architecture_output=architecture_output,
+                    security_output=security_output,
+                    performance_output=performance_output,
+                )
             degraded = any(
                 self.state.branch_statuses.get(branch) == "failed"
                 for branch in ("architecture", "security", "performance")
             )
+            if roadmap_agent_error is not None:
+                degraded = True
             self.state.branch_statuses["roadmap"] = (
                 "degraded" if degraded else "completed"
             )
@@ -384,6 +400,10 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
                 "items": [item.model_dump(mode="json") for item in roadmap_items],
                 "branch_failures": dict(self.state.branch_failures),
             }
+            if roadmap_agent_error is not None:
+                self.state.roadmap_output["roadmap_agent_fallback_reason"] = (
+                    roadmap_agent_error
+                )
             self._mark_node_transition(
                 node_id="roadmap",
                 to_state=FlowNodeState.COMPLETED,
@@ -659,6 +679,7 @@ class RepoClinicFlowRunner:
             security_output=security_output,
             performance_output=performance_output,
             roadmap_items=roadmap_items,
+            analysis_status=summary.analysis_status,
         )
         return write_artifacts(
             output_dir=output_dir,

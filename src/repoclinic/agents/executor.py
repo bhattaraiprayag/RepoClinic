@@ -8,7 +8,7 @@ from typing import Any, Protocol, TypeVar
 
 import orjson
 from crewai import Agent, Crew, Process, Task
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from repoclinic.config.model_factory import ModelFactory
 from repoclinic.config.models import AppConfig
@@ -56,6 +56,20 @@ class BranchExecutor(Protocol):
 
     def run_performance(self, scanner_output: ScannerOutput) -> PerformanceAgentOutput:
         """Run performance branch analysis."""
+
+    def run_roadmap(
+        self,
+        architecture_output: ArchitectureAgentOutput,
+        security_output: SecurityAgentOutput,
+        performance_output: PerformanceAgentOutput,
+    ) -> list[RoadmapItem]:
+        """Run roadmap planning from branch outputs."""
+
+
+class RoadmapPlannerOutput(BaseModel):
+    """CrewAI roadmap planner response envelope."""
+
+    items: list[RoadmapItem] = Field(default_factory=list)
 
 
 class HeuristicBranchExecutor:
@@ -133,56 +147,135 @@ class HeuristicBranchExecutor:
             evidence
             for evidence in scanner_output.evidence_index
             if evidence.source in {"semgrep", "bandit", "osv"}
-            or evidence.signal_type in {"secret", "vuln", "dependency"}
+            or evidence.signal_type in {"secret", "vuln", "auth", "route"}
+            or (evidence.signal_type == "dependency" and evidence.source == "osv")
         ]
-        findings: list[BaseFinding] = []
-        top_risks: list[SecurityRisk] = []
+        checklist: list[tuple[str, str, Severity, list[str], str, str]] = [
+            (
+                "hardcoded-secrets",
+                "Hardcoded secrets review",
+                Severity.HIGH,
+                ["secret", "token", "api key", "apikey", "credential"],
+                "Credential leakage can lead to direct account or infrastructure compromise.",
+                "Move secrets to environment or vault storage, rotate exposed values, and add secret scanning gates.",
+            ),
+            (
+                "unsafe-config-practices",
+                "Unsafe configuration practices review",
+                Severity.MEDIUM,
+                ["debug", "insecure", "cors", "allow all", "unsafe config"],
+                "Insecure defaults can expose sensitive data and increase attack surface.",
+                "Harden security configuration defaults and enforce secure production profiles.",
+            ),
+            (
+                "missing-input-validation",
+                "Input validation coverage review",
+                Severity.HIGH,
+                ["input validation", "unsanitized", "tainted", "user input"],
+                "Unvalidated user input can enable injection and authorization bypass paths.",
+                "Add schema-based request validation and sanitization at API boundaries.",
+            ),
+            (
+                "sql-injection-patterns",
+                "SQL injection pattern review",
+                Severity.HIGH,
+                ["sql injection", "raw sql", "execute(", "query concatenation"],
+                "Unsafe query construction can allow unauthorized data access or mutation.",
+                "Use parameterized queries and ORM safe APIs for all database access paths.",
+            ),
+            (
+                "insecure-jwt-usage",
+                "JWT security review",
+                Severity.HIGH,
+                ["jwt", "none algorithm", "weak signing", "token verify"],
+                "JWT validation mistakes can allow token forgery or privilege escalation.",
+                "Enforce strong algorithms, audience/issuer validation, and token expiry checks.",
+            ),
+            (
+                "weak-password-storage",
+                "Password storage review",
+                Severity.HIGH,
+                ["plaintext password", "md5", "sha1", "weak hash", "password storage"],
+                "Weak password hashing allows credential cracking and account takeover.",
+                "Use adaptive password hashing (bcrypt/argon2) with salts and controlled cost factors.",
+            ),
+            (
+                "exposed-admin-endpoints",
+                "Admin endpoint access-control review",
+                Severity.HIGH,
+                ["admin", "management endpoint", "internal endpoint", "/admin"],
+                "Unauthenticated admin endpoints can expose sensitive operations.",
+                "Protect admin routes with authentication, authorization, and network restrictions.",
+            ),
+            (
+                "dependency-vulnerabilities",
+                "Dependency vulnerability review",
+                Severity.MEDIUM,
+                ["vulnerable", "dependency", "osv", "cve", "ghsa"],
+                "Known vulnerable dependencies increase exploitability of deployed systems.",
+                "Upgrade vulnerable dependencies to patched versions and enforce lockfile hygiene.",
+            ),
+        ]
 
-        for evidence in security_evidence[:10]:
-            severity = _security_severity(evidence)
-            finding = BaseFinding(
-                id=_finding_id("security", evidence.file, evidence.summary),
-                category=FindingCategory.SECURITY,
-                title=f"Security signal from {evidence.source}",
-                description=evidence.summary,
-                severity=severity,
-                status=FindingStatus.CONFIRMED,
-                confidence=min(0.95, max(0.6, evidence.confidence)),
-                symptoms=["Potential exploit surface detected in static evidence"],
-                recommendation=_security_recommendation(evidence),
-                evidence=[_to_finding_evidence(evidence)],
-            )
-            findings.append(finding)
-            top_risks.append(
-                SecurityRisk(
-                    issue=finding.title,
-                    severity=finding.severity,
-                    file=evidence.file,
+        findings: list[BaseFinding] = []
+        for check_id, title, severity, keywords, symptoms, recommendation in checklist:
+            evidence = _find_matching_evidence(security_evidence, keywords)
+            findings.append(
+                _build_check_finding(
+                    scanner_output=scanner_output,
+                    category=FindingCategory.SECURITY,
+                    check_id=check_id,
+                    title=title,
+                    severity=severity,
+                    symptoms=symptoms,
+                    recommendation=recommendation,
+                    evidence=evidence,
                 )
             )
 
-        if not findings:
+        dependency_summary = scanner_output.dependency_summary
+        if (
+            dependency_summary.vulnerability_scan_status == "completed"
+            and dependency_summary.vulnerability_findings
+        ):
+            dependency_evidence = [
+                _to_finding_evidence(dependency_item)
+                for dependency_item in security_evidence
+                if dependency_item.source == "osv"
+            ][:3]
             findings.append(
                 BaseFinding(
                     id=_finding_id(
-                        "security", scanner_output.repo_profile.repo_name, "none"
+                        "security",
+                        scanner_output.repo_profile.repo_name,
+                        "dependency-findings-present",
                     ),
                     category=FindingCategory.SECURITY,
-                    title="No deterministic security evidence found",
-                    description="No semgrep/bandit/osv/secret evidence was available for confirmation.",
-                    severity=Severity.LOW,
-                    status=FindingStatus.INSUFFICIENT_EVIDENCE,
-                    confidence=0.3,
-                    symptoms=["Security branch could not confirm concrete risks"],
-                    recommendation="Enable Semgrep/Bandit/OSV and rescan for higher confidence.",
+                    title="Dependency vulnerabilities confirmed by OSV",
+                    description=(
+                        f"OSV reported {len(dependency_summary.vulnerability_findings)} dependency vulnerabilities."
+                    ),
+                    severity=Severity.HIGH,
+                    status=(
+                        FindingStatus.CONFIRMED
+                        if dependency_evidence
+                        else FindingStatus.SUSPECTED
+                    ),
+                    confidence=0.9,
+                    symptoms=[
+                        "Known vulnerable packages are present in dependency manifests"
+                    ],
+                    recommendation="Prioritize patch upgrades for direct and transitive vulnerable packages.",
+                    evidence=dependency_evidence,
                 )
             )
 
+        top_risks = _top_security_risks(findings)
         return SecurityAgentOutput(
             schema_version=scanner_output.schema_version,
             run_id=scanner_output.run_id,
             findings=findings,
-            top_security_risks=top_risks[:5],
+            top_security_risks=top_risks,
         )
 
     def run_performance(self, scanner_output: ScannerOutput) -> PerformanceAgentOutput:
@@ -192,81 +285,95 @@ class HeuristicBranchExecutor:
             if evidence.signal_type == "perf_hotspot"
             or _contains_perf_signal(evidence.summary)
         ]
-        findings: list[BaseFinding] = []
-        top_risks: list[PerformanceRisk] = []
-
-        for evidence in performance_evidence[:10]:
-            finding = BaseFinding(
-                id=_finding_id("performance", evidence.file, evidence.summary),
+        checklist: list[tuple[str, str, Severity, list[str], str, str]] = [
+            (
+                "heavy-sync-operations",
+                "Heavy synchronous operation review",
+                Severity.MEDIUM,
+                ["synchronous", "sync", "blocking", "await-less"],
+                "Blocking operations can increase response latency and reduce throughput under load.",
+                "Move blocking workloads off hot request paths and prefer asynchronous/background processing.",
+            ),
+            (
+                "n-plus-one-query-patterns",
+                "N+1 query pattern review",
+                Severity.HIGH,
+                ["n+1", "multiple query", "query per item", "loop query"],
+                "N+1 access patterns create multiplicative latency and database pressure.",
+                "Batch related fetches and use eager-loading or prefetch strategies for dependent data.",
+            ),
+            (
+                "missing-caching-opportunities",
+                "Caching opportunity review",
+                Severity.MEDIUM,
+                ["cache", "no cache", "recompute", "repeat query"],
+                "Missing caches can increase compute and database cost for repeated reads.",
+                "Introduce response/query caching with clear invalidation and bounded TTL policies.",
+            ),
+            (
+                "large-payload-risks",
+                "Large payload risk review",
+                Severity.MEDIUM,
+                ["payload", "large response", "serialize", "memory growth"],
+                "Oversized payloads increase bandwidth and memory overhead at runtime.",
+                "Add field filtering, compression, and payload size limits on expensive endpoints.",
+            ),
+            (
+                "db-indexing-hints",
+                "Database indexing review",
+                Severity.MEDIUM,
+                ["index", "full scan", "table scan", "order by"],
+                "Missing indexes can cause full table scans and high query latency.",
+                "Review frequent filters/sorts and add supporting indexes for dominant access patterns.",
+            ),
+            (
+                "loop-and-io-hotspots",
+                "Loop and file I/O hotspot review",
+                Severity.MEDIUM,
+                ["loop", "file io", "read file", "write file", "iterative"],
+                "Unbounded loops and heavy I/O can cause CPU spikes and request stalls.",
+                "Profile loop-heavy and file I/O paths, then batch, stream, or debounce operations.",
+            ),
+            (
+                "missing-pagination-in-apis",
+                "API pagination review",
+                Severity.HIGH,
+                ["pagination", "list endpoint", "all records", "offset", "limit"],
+                "Unpaginated list endpoints can trigger high memory use and slow responses.",
+                "Require pagination parameters and enforce safe page-size defaults on list APIs.",
+            ),
+        ]
+        findings = [
+            _build_check_finding(
+                scanner_output=scanner_output,
                 category=FindingCategory.PERFORMANCE,
-                title="Potential performance/scalability signal detected",
-                description=evidence.summary,
-                severity=Severity.MEDIUM,
-                status=FindingStatus.CONFIRMED,
-                confidence=min(0.9, max(0.55, evidence.confidence)),
-                symptoms=["Potential latency or throughput degradation"],
-                recommendation="Review the identified hotspot and add batching/caching/pagination as needed.",
-                evidence=[_to_finding_evidence(evidence)],
+                check_id=check_id,
+                title=title,
+                severity=severity,
+                symptoms=symptoms,
+                recommendation=recommendation,
+                evidence=_find_matching_evidence(performance_evidence, keywords),
             )
-            findings.append(finding)
-            top_risks.append(
-                PerformanceRisk(
-                    issue=finding.title,
-                    severity=finding.severity,
-                    file=evidence.file,
-                )
-            )
-
-        if not findings:
-            route_evidence = _first_evidence(scanner_output, {"route", "entrypoint"})
-            if route_evidence:
-                findings.append(
-                    BaseFinding(
-                        id=_finding_id(
-                            "performance", route_evidence.file, "api-pagination"
-                        ),
-                        category=FindingCategory.PERFORMANCE,
-                        title="API pagination and caching require review",
-                        description="API surface detected; pagination/caching guarantees are not yet evidenced.",
-                        severity=Severity.MEDIUM,
-                        status=FindingStatus.SUSPECTED,
-                        confidence=0.45,
-                        symptoms=["Large payload and latency risk on list endpoints"],
-                        recommendation="Audit list endpoints for pagination and response-size controls.",
-                        evidence=[_to_finding_evidence(route_evidence)],
-                    )
-                )
-                top_risks.append(
-                    PerformanceRisk(
-                        issue="Review pagination/caching on API routes",
-                        severity=Severity.MEDIUM,
-                        file=route_evidence.file,
-                    )
-                )
-            else:
-                findings.append(
-                    BaseFinding(
-                        id=_finding_id(
-                            "performance", scanner_output.repo_profile.repo_name, "none"
-                        ),
-                        category=FindingCategory.PERFORMANCE,
-                        title="Insufficient performance evidence",
-                        description="No deterministic performance hotspots were detected.",
-                        severity=Severity.LOW,
-                        status=FindingStatus.INSUFFICIENT_EVIDENCE,
-                        confidence=0.3,
-                        symptoms=[
-                            "No clear bottlenecks identified from current evidence"
-                        ],
-                        recommendation="Expand scanner heuristics for query and I/O hotspot detection.",
-                    )
-                )
-
+            for check_id, title, severity, keywords, symptoms, recommendation in checklist
+        ]
+        top_risks = _top_performance_risks(findings)
         return PerformanceAgentOutput(
             schema_version=scanner_output.schema_version,
             run_id=scanner_output.run_id,
             findings=findings,
-            top_performance_risks=top_risks[:5],
+            top_performance_risks=top_risks,
+        )
+
+    def run_roadmap(
+        self,
+        architecture_output: ArchitectureAgentOutput,
+        security_output: SecurityAgentOutput,
+        performance_output: PerformanceAgentOutput,
+    ) -> list[RoadmapItem]:
+        return synthesize_roadmap(
+            architecture_output=architecture_output,
+            security_output=security_output,
+            performance_output=performance_output,
         )
 
 
@@ -293,7 +400,9 @@ class CrewBranchExecutor:
     ) -> ArchitectureAgentOutput:
         task_description = (
             "Analyze repository scanner evidence and return ArchitectureAgentOutput JSON. "
-            "Use only supplied evidence and include confidence and citations."
+            "Use only supplied evidence and include confidence and citations. "
+            "Status contract: use 'failed' only if branch execution itself failed; "
+            "use 'insufficient_evidence' when evidence is missing and 'suspected' when uncertain."
         )
         expected = "Structured ArchitectureAgentOutput with architecture findings."
         context = self._serialize_context(
@@ -312,7 +421,12 @@ class CrewBranchExecutor:
     def run_security(self, scanner_output: ScannerOutput) -> SecurityAgentOutput:
         task_description = (
             "Analyze scanner security evidence and return SecurityAgentOutput JSON. "
-            "Report only evidence-linked risks with explicit severity and fixes."
+            "Report only evidence-linked risks with explicit severity and fixes. "
+            "Explicitly assess: hardcoded secrets, unsafe config practices, missing input validation, "
+            "SQL injection patterns, insecure JWT usage, weak password storage, exposed admin endpoints, "
+            "and dependency vulnerabilities. "
+            "Status contract: use 'failed' only if branch execution itself failed; "
+            "use 'insufficient_evidence' when evidence is missing and 'suspected' when uncertain."
         )
         expected = (
             "Structured SecurityAgentOutput with top security risks and findings."
@@ -333,7 +447,11 @@ class CrewBranchExecutor:
     def run_performance(self, scanner_output: ScannerOutput) -> PerformanceAgentOutput:
         task_description = (
             "Analyze scanner performance evidence and return PerformanceAgentOutput JSON. "
-            "Prioritize scalability bottlenecks with symptoms and recommendations."
+            "Prioritize scalability bottlenecks with symptoms and recommendations. "
+            "Explicitly assess: heavy synchronous operations, N+1 query patterns, missing caching, "
+            "large payload risk, indexing hints, loop/file-I/O hotspots, and missing pagination. "
+            "Status contract: use 'failed' only if branch execution itself failed; "
+            "use 'insufficient_evidence' when evidence is missing and 'suspected' when uncertain."
         )
         expected = (
             "Structured PerformanceAgentOutput with top performance risks and findings."
@@ -350,6 +468,39 @@ class CrewBranchExecutor:
             output_model=PerformanceAgentOutput,
         )
         return self._normalize_output_metadata(output, scanner_output)
+
+    def run_roadmap(
+        self,
+        architecture_output: ArchitectureAgentOutput,
+        security_output: SecurityAgentOutput,
+        performance_output: PerformanceAgentOutput,
+    ) -> list[RoadmapItem]:
+        task_description = (
+            "Consolidate architecture, security, and performance findings and return "
+            "RoadmapPlannerOutput JSON with an 'items' list of RoadmapItem objects. "
+            "Each item must include priority, impact, effort, risk, and justification."
+        )
+        expected = "Structured RoadmapPlannerOutput with prioritized roadmap items."
+        context_payload = {
+            "architecture": architecture_output.model_dump(mode="json"),
+            "security": security_output.model_dump(mode="json"),
+            "performance": performance_output.model_dump(mode="json"),
+        }
+        context = orjson.dumps(context_payload, option=orjson.OPT_SORT_KEYS).decode(
+            "utf-8"
+        )
+        self._token_budgeter.ensure_within_budget(
+            context, self.config.token_budgets.roadmap_context
+        )
+        output = self._run_task(
+            role="Roadmap Planner Agent",
+            goal="Produce a realistic, prioritized engineering roadmap from validated findings.",
+            backstory="Technical planner focused on actionable sequencing and execution risk management.",
+            task_description=f"{task_description}\n\nBranch context:\n{context}",
+            expected_output=expected,
+            output_model=RoadmapPlannerOutput,
+        )
+        return output.items
 
     def _run_task(
         self,
@@ -590,6 +741,110 @@ def _to_finding_evidence(evidence: EvidenceItem) -> FindingEvidence:
         source=evidence.source,
         rule_id=None,
     )
+
+
+def _find_matching_evidence(
+    evidence_items: list[EvidenceItem], keywords: list[str]
+) -> EvidenceItem | None:
+    normalized_keywords = [keyword.lower() for keyword in keywords]
+    for evidence in evidence_items:
+        haystack = f"{evidence.summary} {evidence.file}".lower()
+        if any(keyword in haystack for keyword in normalized_keywords):
+            return evidence
+    return None
+
+
+def _build_check_finding(
+    *,
+    scanner_output: ScannerOutput,
+    category: FindingCategory,
+    check_id: str,
+    title: str,
+    severity: Severity,
+    symptoms: str,
+    recommendation: str,
+    evidence: EvidenceItem | None,
+) -> BaseFinding:
+    if evidence is None:
+        return BaseFinding(
+            id=_finding_id(
+                category.value, scanner_output.repo_profile.repo_name, check_id
+            ),
+            category=category,
+            title=title,
+            description=(
+                f"No deterministic evidence confirmed this check: {title.lower()}."
+            ),
+            severity=severity,
+            status=FindingStatus.INSUFFICIENT_EVIDENCE,
+            confidence=0.35,
+            symptoms=[symptoms],
+            recommendation=recommendation,
+        )
+
+    status = (
+        FindingStatus.CONFIRMED
+        if evidence.confidence >= 0.7
+        else FindingStatus.SUSPECTED
+    )
+    return BaseFinding(
+        id=_finding_id(category.value, evidence.file, check_id),
+        category=category,
+        title=title,
+        description=evidence.summary,
+        severity=severity,
+        status=status,
+        confidence=min(0.95, max(0.45, evidence.confidence)),
+        symptoms=[symptoms],
+        recommendation=recommendation,
+        evidence=[_to_finding_evidence(evidence)],
+    )
+
+
+def _top_security_risks(findings: list[BaseFinding]) -> list[SecurityRisk]:
+    actionable = [
+        finding
+        for finding in findings
+        if finding.status in {FindingStatus.CONFIRMED, FindingStatus.SUSPECTED}
+    ]
+    ordered = sorted(
+        actionable,
+        key=lambda finding: (
+            SEVERITY_ORDER.get(finding.severity, 4),
+            1 - finding.confidence,
+        ),
+    )
+    return [
+        SecurityRisk(
+            issue=finding.title,
+            severity=finding.severity,
+            file=finding.evidence[0].file if finding.evidence else "unknown",
+        )
+        for finding in ordered[:5]
+    ]
+
+
+def _top_performance_risks(findings: list[BaseFinding]) -> list[PerformanceRisk]:
+    actionable = [
+        finding
+        for finding in findings
+        if finding.status in {FindingStatus.CONFIRMED, FindingStatus.SUSPECTED}
+    ]
+    ordered = sorted(
+        actionable,
+        key=lambda finding: (
+            SEVERITY_ORDER.get(finding.severity, 4),
+            1 - finding.confidence,
+        ),
+    )
+    return [
+        PerformanceRisk(
+            issue=finding.title,
+            severity=finding.severity,
+            file=finding.evidence[0].file if finding.evidence else "unknown",
+        )
+        for finding in ordered[:5]
+    ]
 
 
 def _security_severity(evidence: EvidenceItem) -> Severity:

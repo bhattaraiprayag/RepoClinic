@@ -18,10 +18,12 @@ from repoclinic.schemas.output_models import (
     AnalysisStatus,
     RoadmapItem,
     ScannerStageStatus,
+    ScannerToolingStatus,
     StageStatus,
     SummaryJson,
     SummaryRiskItem,
     SummaryRoadmapItem,
+    ToolingStatus,
 )
 from repoclinic.schemas.scanner_models import ScannerOutput
 
@@ -88,10 +90,25 @@ def build_summary_json(
                 priority=item.priority,
                 task=item.task,
                 effort=item.effort,
+                impact=item.impact,
+                risk=item.risk,
+                justification=item.justification,
             )
             for item in roadmap_items
         ],
         key=lambda item: (PRIORITY_ORDER[item.priority], item.task),
+    )
+    scanner_tooling = sorted(
+        [
+            ScannerToolingStatus(
+                tool=item.tool,
+                status=_normalize_tooling_status(item.status),
+                exit_code=item.exit_code,
+                details=item.details,
+            )
+            for item in scanner_output.scanner_tool_runs
+        ],
+        key=lambda item: item.tool,
     )
 
     return SummaryJson(
@@ -104,6 +121,7 @@ def build_summary_json(
         top_security_risks=top_security_risks[:5],
         top_performance_risks=top_performance_risks[:5],
         roadmap=roadmap,
+        scanner_tooling=scanner_tooling,
         analysis_status=AnalysisStatus(
             scanner=_normalize_scanner_status(branch_statuses.get("scanner")),
             architecture=_normalize_stage_status(branch_statuses.get("architecture")),
@@ -121,6 +139,7 @@ def build_report_markdown(
     security_output: SecurityAgentOutput,
     performance_output: PerformanceAgentOutput,
     roadmap_items: list[RoadmapItem],
+    analysis_status: AnalysisStatus | None = None,
 ) -> str:
     """Render report.md using fixed section ordering."""
     combined_findings = _top_findings(
@@ -130,7 +149,7 @@ def build_report_markdown(
     )
     summary_table_rows = "\n".join(
         [
-            f"| {idx} | {finding.category.value} | {finding.severity.value} | {finding.title} | {finding.status.value} |"
+            f"| {idx} | {finding.category.value} | {finding.severity.value} | {finding.title} | {_render_finding_status(finding.status)} |"
             for idx, finding in enumerate(combined_findings[:10], start=1)
         ]
     )
@@ -140,6 +159,8 @@ def build_report_markdown(
     security_lines = _finding_lines(security_output.findings)
     performance_lines = _finding_lines(performance_output.findings)
     roadmap_lines = _roadmap_lines(roadmap_items)
+    stage_status_lines = _analysis_status_lines(analysis_status)
+    scanner_tooling_lines = _scanner_tooling_lines(scanner_output)
     module_lines = (
         "\n".join(
             [
@@ -155,6 +176,12 @@ def build_report_markdown(
     return "\n".join(
         [
             "# Repository Analysis Report",
+            "",
+            "## Analysis Stage Status",
+            stage_status_lines,
+            "",
+            "## Scanner Tooling Status",
+            scanner_tooling_lines,
             "",
             "## Repository Overview",
             f"- Repository: `{scanner_output.repo_profile.repo_name}`",
@@ -252,7 +279,7 @@ def _finding_lines(findings: list[BaseFinding]) -> str:
     lines = []
     for finding in _top_findings(findings):
         lines.append(
-            f"- **{finding.severity.value}** `{finding.status.value}` - {finding.title}: {finding.recommendation}"
+            f"- **{finding.severity.value}** `{_render_finding_status(finding.status)}` - {finding.title}: {finding.recommendation}"
         )
     return "\n".join(lines)
 
@@ -265,8 +292,52 @@ def _roadmap_lines(items: list[RoadmapItem]) -> str:
         [
             (
                 f"- **{item.priority.value}** ({item.timeline_bucket}) - {item.task} "
-                f"[impact: {item.impact}; effort: {item.effort}; risk: {item.risk}]"
+                f"[impact: {item.impact}; effort: {item.effort}; risk: {item.risk}; justification: {item.justification}]"
             )
             for item in ordered
         ]
     )
+
+
+def _analysis_status_lines(analysis_status: AnalysisStatus | None) -> str:
+    if analysis_status is None:
+        return "- Stage status was not provided."
+    payload = analysis_status.model_dump(mode="json")
+    return "\n".join([f"- `{stage}`: `{payload[stage]}`" for stage in payload.keys()])
+
+
+def _scanner_tooling_lines(scanner_output: ScannerOutput) -> str:
+    if not scanner_output.scanner_tool_runs:
+        return "- No scanner tool executions recorded."
+    lines: list[str] = []
+    for item in sorted(scanner_output.scanner_tool_runs, key=lambda run: run.tool):
+        status = _normalize_tooling_status(item.status)
+        metadata: list[str] = []
+        if item.exit_code is not None:
+            metadata.append(f"exit_code={item.exit_code}")
+        if item.details:
+            metadata.append(f"details={_truncate_detail(item.details)}")
+        suffix = f" ({'; '.join(metadata)})" if metadata else ""
+        lines.append(f"- `{item.tool}`: `{status}`{suffix}")
+    return "\n".join(lines)
+
+
+def _render_finding_status(status: FindingStatus) -> str:
+    if status == FindingStatus.FAILED:
+        return "analysis_finding_failed"
+    return status.value
+
+
+def _normalize_tooling_status(value: str) -> ToolingStatus:
+    if value == "completed":
+        return "completed"
+    if value == "unavailable":
+        return "tooling_unavailable"
+    return "tool_execution_failed"
+
+
+def _truncate_detail(value: str, limit: int = 140) -> str:
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: limit - 3]}..."

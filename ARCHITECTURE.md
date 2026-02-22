@@ -96,6 +96,7 @@ erDiagram
   - Langfuse SDK over `LANGFUSE_BASE_URL` (Langfuse Cloud endpoint)
 - **Toolchain dependencies**
   - `git`, `rg`, `semgrep`, `bandit`, `osv-scanner`
+  - `go` (required when `osv-scanner` is installed from source via `go install`)
 
 ## 6) Runtime control points
 

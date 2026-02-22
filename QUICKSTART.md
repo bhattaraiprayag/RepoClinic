@@ -5,6 +5,7 @@
 - Linux/macOS (or WSL2 on Windows)
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
+- [Go](https://go.dev/doc/install) 1.25.7+ (required when installing `osv-scanner` from source)
 - Docker (for container workflows)
 - Git
 
@@ -16,10 +17,19 @@ cd RepoClinic
 uv venv
 source .venv/bin/activate
 uv sync
+go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
 cp .env.example .env
 ```
 
 Populate `.env` with provider credentials and optional Langfuse keys.
+
+Verify scanner tools:
+
+```bash
+semgrep --version
+bandit --version
+osv-scanner --version
+```
 
 ## 3) Initial setup (with Makefile)
 
@@ -27,6 +37,7 @@ Populate `.env` with provider credentials and optional Langfuse keys.
 git clone <your-repoclinic-repo-url>
 cd RepoClinic
 make sync
+go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
 cp .env.example .env
 ```
 
@@ -55,6 +66,13 @@ uv run repoclinic analyze \
 uv run repoclinic analyze \
   --repo https://github.com/owner/repository \
   --output-dir artifacts/remote-check
+```
+
+### Run using root `main.py`
+
+```bash
+python main.py --repo https://github.com/owner/repository
+python main.py --path /absolute/path/to/repository
 ```
 
 ### Check a repository and store results in a specific location

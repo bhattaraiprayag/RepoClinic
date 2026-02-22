@@ -1,36 +1,85 @@
 # RepoClinic
 
-RepoClinic is a deterministic repository analysis CLI built on a stateful scanner-first flow (fan-out branch analysis, fan-in roadmap synthesis). It analyzes local or GitHub repositories and produces two artifacts:
+RepoClinic is a scanner-first repository analysis CLI built with CrewAI flow orchestration. It analyzes a GitHub URL or local folder and generates:
 
-- `report.md` for human-readable engineering review
-- `summary.json` for schema-validated machine consumption
+- `report.md` (human-readable engineering report)
+- `summary.json` (structured machine-readable summary)
 
-## Core capabilities
+## Setup
 
-- Deterministic scanner pipeline with bounded repository traversal and evidence normalization
-- Parallel architecture, security, and performance analysis branches
-- Checkpointed flow execution with resume support
-- Structured output contracts using Pydantic models
-- Optional Langfuse Cloud observability integration for run/stage traces
-- Local and containerized execution paths
-- Built-in quality gates via pre-commit and GitHub Actions CI
+### Prerequisites
 
-## Documentation index
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/)
+- Git
+- ripgrep (`rg`)
+- Go 1.25.7+ (required when installing `osv-scanner` from source)
+- Docker (optional, for containerized runs)
 
-- [QUICKSTART.md](QUICKSTART.md) - installation and day-one usage (local, Docker, and Makefile workflows)
-- [ARCHITECTURE.md](ARCHITECTURE.md) - component design, flow execution model, and data schema
-- [ROADMAP.md](ROADMAP.md) - completed milestones and forward-looking priorities
-- [CONTRIBUTING.md](CONTRIBUTING.md) - contribution and review workflow
-- [CHANGELOG.md](CHANGELOG.md) - release history
-- [LICENSE.md](LICENSE.md) - license terms
-
-## Minimal start
+### Install and bootstrap
 
 ```bash
 uv venv
+source .venv/bin/activate
 uv sync
+go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
 cp .env.example .env
-uv run repoclinic validate-config
 ```
 
-For runnable examples (local repo checks, GitHub checks, custom output directories, Docker runs, and Langfuse Cloud setup), use [QUICKSTART.md](QUICKSTART.md).
+Verify scanner tooling is present:
+
+```bash
+semgrep --version
+bandit --version
+osv-scanner --version
+```
+
+## How to run
+
+### Preferred CLI
+
+```bash
+uv run repoclinic analyze --repo https://github.com/owner/repo --output-dir artifacts
+uv run repoclinic analyze --path /absolute/path/to/repo --output-dir artifacts
+```
+
+### Requirement-compatible root entrypoint
+
+```bash
+python main.py --repo https://github.com/owner/repo
+python main.py --path /absolute/path/to/repo
+```
+
+## Agent design choices
+
+RepoClinic follows a scanner-first dependency chain:
+
+1. **Code Scanner stage** (deterministic tooling and filesystem analysis)
+2. **Architecture Analyst Agent**
+3. **Security Agent**
+4. **Performance Agent**
+5. **Roadmap Planner Agent** (CrewAI-first with deterministic fallback)
+
+The scanner stage executes first, architecture/security/performance depend on scanner output, and roadmap synthesis runs after all three complete.
+
+## Known limitations
+
+- Findings are static-analysis and heuristic-driven; runtime behavior is inferred, not executed.
+- Detection quality depends on scanner availability (`semgrep`, `bandit`, `osv-scanner`) and repository signal quality.
+- Extremely large repositories may require tighter scan-policy tuning for execution time.
+
+## Scaling approach
+
+- Keep scanner execution deterministic with bounded file traversal and configurable limits.
+- Run branch analysis in parallel to minimize end-to-end latency.
+- Use checkpointed flow persistence for resumability and fault tolerance.
+- Containerize execution for reproducible scanner/toolchain versions in CI/CD.
+
+## Documentation index
+
+- [QUICKSTART.md](QUICKSTART.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [ROADMAP.md](ROADMAP.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CHANGELOG.md](CHANGELOG.md)
+- [LICENSE.md](LICENSE.md)

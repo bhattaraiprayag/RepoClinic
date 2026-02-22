@@ -7,16 +7,20 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+ToolRunStatus = Literal["completed", "failed", "unavailable"]
 
 
 @dataclass(frozen=True)
 class ToolRunResult:
     """Normalized command execution result."""
 
-    status: str
+    status: ToolRunStatus
     payload: dict[str, Any]
     error: str | None = None
+    exit_code: int | None = None
+    stderr: str | None = None
 
 
 class ToolRunners:
@@ -33,9 +37,29 @@ class ToolRunners:
         )
 
     def run_bandit(self, repo_path: Path) -> ToolRunResult:
+        excluded_paths = ",".join(
+            [
+                ".git",
+                "node_modules",
+                "dist",
+                ".venv",
+                "__pycache__",
+                "tests/fixtures",
+                ".scanner-workspace",
+            ]
+        )
         return self._run_json_command(
             tool_name="bandit",
-            cmd=["bandit", "-r", str(repo_path), "-f", "json"],
+            cmd=[
+                "bandit",
+                "-q",
+                "-r",
+                str(repo_path),
+                "-f",
+                "json",
+                "-x",
+                excluded_paths,
+            ],
             success_codes={0, 1},
         )
 
@@ -52,6 +76,7 @@ class ToolRunners:
                 "json",
             ],
             success_codes={0, 1},
+            unavailable_codes={128},
         )
 
     def _run_json_command(
@@ -60,12 +85,16 @@ class ToolRunners:
         tool_name: str,
         cmd: list[str],
         success_codes: set[int],
+        unavailable_codes: set[int] | None = None,
     ) -> ToolRunResult:
         if shutil.which(tool_name) is None:
             return ToolRunResult(
-                status="unavailable", payload={}, error=f"{tool_name} not found"
+                status="unavailable",
+                payload={},
+                error=f"{tool_name} not found",
             )
 
+        unavailable_codes = unavailable_codes or set()
         try:
             result = subprocess.run(
                 cmd,
@@ -76,7 +105,23 @@ class ToolRunners:
             )
         except subprocess.TimeoutExpired:
             return ToolRunResult(
-                status="failed", payload={}, error=f"{tool_name} timed out"
+                status="failed",
+                payload={},
+                error=f"{tool_name} timed out",
+            )
+
+        if result.returncode in unavailable_codes:
+            message = (
+                result.stderr.strip()
+                or result.stdout.strip()
+                or (f"{tool_name} reported unavailable scan context")
+            )
+            return ToolRunResult(
+                status="unavailable",
+                payload={},
+                error=message,
+                exit_code=result.returncode,
+                stderr=result.stderr.strip() or None,
             )
 
         if result.returncode not in success_codes:
@@ -84,18 +129,53 @@ class ToolRunners:
                 status="failed",
                 payload={},
                 error=result.stderr.strip() or f"{tool_name} failed",
+                exit_code=result.returncode,
+                stderr=result.stderr.strip() or None,
             )
 
         stdout = result.stdout.strip()
         if not stdout:
-            return ToolRunResult(status="completed", payload={})
+            return ToolRunResult(
+                status="completed",
+                payload={},
+                exit_code=result.returncode,
+                stderr=result.stderr.strip() or None,
+            )
 
-        try:
-            payload = json.loads(stdout)
-        except json.JSONDecodeError:
+        payload = self._extract_json_payload(stdout)
+        if payload is None:
             return ToolRunResult(
                 status="failed",
                 payload={},
                 error=f"{tool_name} produced non-JSON output",
+                exit_code=result.returncode,
+                stderr=result.stderr.strip() or None,
             )
-        return ToolRunResult(status="completed", payload=payload)
+        return ToolRunResult(
+            status="completed",
+            payload=payload,
+            exit_code=result.returncode,
+            stderr=result.stderr.strip() or None,
+        )
+
+    @staticmethod
+    def _extract_json_payload(stdout: str) -> dict[str, Any] | None:
+        try:
+            payload = json.loads(stdout)
+            if isinstance(payload, dict):
+                return payload
+        except json.JSONDecodeError:
+            pass
+
+        decoder = json.JSONDecoder()
+        start = stdout.find("{")
+        while start != -1:
+            try:
+                payload, _ = decoder.raw_decode(stdout[start:])
+            except json.JSONDecodeError:
+                start = stdout.find("{", start + 1)
+                continue
+            if isinstance(payload, dict):
+                return payload
+            start = stdout.find("{", start + 1)
+        return None

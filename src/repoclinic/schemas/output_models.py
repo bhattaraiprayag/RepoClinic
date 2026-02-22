@@ -16,6 +16,7 @@ TimelineBucket = Literal[
 ]
 StageStatus = Literal["completed", "failed", "degraded"]
 ScannerStageStatus = Literal["completed", "failed"]
+ToolingStatus = Literal["completed", "tooling_unavailable", "tool_execution_failed"]
 
 
 class RoadmapItem(StrictSchemaModel):
@@ -45,6 +46,9 @@ class SummaryRoadmapItem(StrictSchemaModel):
     priority: Priority
     task: str = Field(min_length=1)
     effort: str = Field(min_length=1)
+    impact: str = Field(min_length=1)
+    risk: str = Field(min_length=1)
+    justification: str = Field(min_length=1)
 
 
 class AnalysisStatus(StrictSchemaModel):
@@ -57,6 +61,15 @@ class AnalysisStatus(StrictSchemaModel):
     roadmap: StageStatus
 
 
+class ScannerToolingStatus(StrictSchemaModel):
+    """Scanner tool execution status in report/summary payloads."""
+
+    tool: str = Field(min_length=1)
+    status: ToolingStatus
+    exit_code: int | None = None
+    details: str | None = None
+
+
 class SummaryJson(VersionedRunModel):
     """Canonical summary.json schema."""
 
@@ -67,4 +80,5 @@ class SummaryJson(VersionedRunModel):
     top_security_risks: list[SummaryRiskItem] = Field(default_factory=list)
     top_performance_risks: list[SummaryRiskItem] = Field(default_factory=list)
     roadmap: list[SummaryRoadmapItem] = Field(default_factory=list)
+    scanner_tooling: list[ScannerToolingStatus] = Field(default_factory=list)
     analysis_status: AnalysisStatus

@@ -24,12 +24,13 @@ from repoclinic.scanner.normalizer import (
 )
 from repoclinic.scanner.persistence import ScannerPersistence
 from repoclinic.scanner.source_resolver import SourceResolver
-from repoclinic.scanner.tool_runners import ToolRunners
+from repoclinic.scanner.tool_runners import ToolRunResult, ToolRunners
 from repoclinic.schemas.input_models import AnalyzeRequest
 from repoclinic.schemas.scanner_models import (
     DependencyFinding,
     DependencySummary,
     RepoProfile,
+    ScannerToolRun,
     ScannerOutput,
 )
 
@@ -69,18 +70,19 @@ class ScannerPipeline:
             manifests=manifest_paths,
         )
         dependency_findings: list[DependencyFinding] = []
+        scanner_tool_runs: list[ScannerToolRun] = []
 
         tool_runners = ToolRunners(
             timeout_seconds=request.execution.timeouts.scanner_seconds
         )
-        tool_statuses: list[str] = []
+        dependency_tool_statuses: list[str] = []
 
         if self._is_enabled(
             request.execution.feature_flags.enable_semgrep,
             self.config.feature_flags.enable_semgrep,
         ):
             semgrep_result = tool_runners.run_semgrep(resolved.resolved_path)
-            tool_statuses.append(semgrep_result.status)
+            scanner_tool_runs.append(_to_tool_run("semgrep", semgrep_result))
             if semgrep_result.status == "completed":
                 evidence.extend(normalize_semgrep(semgrep_result.payload))
 
@@ -89,7 +91,7 @@ class ScannerPipeline:
             self.config.feature_flags.enable_bandit,
         ):
             bandit_result = tool_runners.run_bandit(resolved.resolved_path)
-            tool_statuses.append(bandit_result.status)
+            scanner_tool_runs.append(_to_tool_run("bandit", bandit_result))
             if bandit_result.status == "completed":
                 evidence.extend(normalize_bandit(bandit_result.payload))
 
@@ -98,12 +100,13 @@ class ScannerPipeline:
             self.config.feature_flags.enable_osv,
         ):
             osv_result = tool_runners.run_osv(resolved.resolved_path)
-            tool_statuses.append(osv_result.status)
+            scanner_tool_runs.append(_to_tool_run("osv-scanner", osv_result))
+            dependency_tool_statuses.append(osv_result.status)
             if osv_result.status == "completed":
                 osv_evidence, dependency_findings = normalize_osv(osv_result.payload)
                 evidence.extend(osv_evidence)
 
-        dependency_status = _resolve_dependency_status(tool_statuses)
+        dependency_status = _resolve_dependency_status(dependency_tool_statuses)
 
         scanner_output = ScannerOutput(
             schema_version=request.schema_version,
@@ -124,6 +127,7 @@ class ScannerPipeline:
                 vulnerability_findings=dependency_findings,
             ),
             evidence_index=evidence,
+            scanner_tool_runs=scanner_tool_runs,
         )
         self.persistence.persist_scanner_output(
             output=scanner_output,
@@ -141,8 +145,19 @@ def _resolve_dependency_status(
 ) -> Literal["completed", "failed", "unavailable"]:
     if not tool_statuses:
         return "unavailable"
-    if any(status == "failed" for status in tool_statuses):
-        return "failed"
     if any(status == "completed" for status in tool_statuses):
         return "completed"
+    if all(status == "unavailable" for status in tool_statuses):
+        return "unavailable"
+    if any(status == "failed" for status in tool_statuses):
+        return "failed"
     return "unavailable"
+
+
+def _to_tool_run(tool: str, result: ToolRunResult) -> ScannerToolRun:
+    return ScannerToolRun(
+        tool=tool,
+        status=result.status,
+        exit_code=result.exit_code,
+        details=result.error or result.stderr,
+    )
