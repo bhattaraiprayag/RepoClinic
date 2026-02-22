@@ -52,6 +52,7 @@ class ProviderProfile(StrictSchemaModel):
                 raise ValueError("LM Studio profiles must define base_url")
             if not self.api_key_env:
                 raise ValueError("LM Studio profiles must define api_key_env")
+            object.__setattr__(self, "model", _normalize_lmstudio_model(self.model))
         if self.max_tokens > self.capabilities.context_window:
             raise ValueError("max_tokens cannot exceed provider context_window")
         return self
@@ -119,3 +120,12 @@ class AppConfig(StrictSchemaModel):
         if self.default_provider_profile not in self.provider_profiles:
             raise ValueError("default_provider_profile must exist in provider_profiles")
         return self
+
+
+def _normalize_lmstudio_model(model: str) -> str:
+    normalized = model.strip()
+    if normalized.startswith("lm_studio/"):
+        return normalized
+    if normalized.startswith("lm-studio/"):
+        return f"lm_studio/{normalized[len('lm-studio/') :]}"
+    return f"lm_studio/{normalized}"

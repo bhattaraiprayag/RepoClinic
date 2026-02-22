@@ -98,4 +98,30 @@ provider_profiles:
     )
     profile = config.provider_profiles["lm-studio-default"]
     assert profile.base_url == "http://192.168.1.70:1234/v1"
-    assert profile.model == "qwen/qwen3-vl-30b"
+    assert profile.model == "lm_studio/qwen/qwen3-vl-30b"
+
+
+def test_lmstudio_api_base_alias_override_applies(tmp_path: Path) -> None:
+    """LM_STUDIO_API_BASE should work as alias for base URL override."""
+    config_path = _write_config(
+        tmp_path,
+        """
+schema_version: "1.0.0"
+default_provider_profile: "lm-studio-default"
+provider_profiles:
+  lm-studio-default:
+    provider_type: "lm_studio"
+    model: "default-model"
+    api_key_env: "LM_STUDIO_AUTH_TOKEN"
+    base_url: "http://127.0.0.1:1234/v1"
+    max_tokens: 1024
+    capabilities:
+      context_window: 16384
+""".strip(),
+    )
+    config = load_app_config(
+        config_path,
+        env={"LM_STUDIO_API_BASE": "http://localhost:1234/v1"},
+    )
+    profile = config.provider_profiles["lm-studio-default"]
+    assert profile.base_url == "http://localhost:1234/v1"

@@ -38,6 +38,7 @@ class ModelFactory:
         profile = self.get_profile(profile_name)
         api_key: str | None = None
         base_url: str | None = profile.base_url
+        model_name = profile.model
 
         if profile.provider_type == ProviderType.OPENAI:
             assert profile.api_key_env is not None
@@ -50,11 +51,16 @@ class ModelFactory:
             assert profile.api_key_env is not None
             api_key = env.get(profile.api_key_env)
             if not api_key:
-                raise ValueError(f"Missing LM Studio auth env var: {profile.api_key_env}")
+                api_key = env.get("LM_STUDIO_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    f"Missing LM Studio auth env var: {profile.api_key_env} (or LM_STUDIO_API_KEY)"
+                )
             base_url = _normalize_lmstudio_base_url(base_url)
+            model_name = _normalize_lmstudio_model(profile.model)
 
         return LLM(
-            model=profile.model,
+            model=model_name,
             temperature=profile.temperature,
             seed=profile.seed,
             max_tokens=profile.max_tokens,
@@ -69,3 +75,12 @@ def _normalize_lmstudio_base_url(base_url: str) -> str:
     if normalized.endswith("/chat/completions"):
         normalized = normalized[: -len("/chat/completions")]
     return normalized
+
+
+def _normalize_lmstudio_model(model_name: str) -> str:
+    normalized = model_name.strip()
+    if normalized.startswith("lm_studio/"):
+        return normalized
+    if normalized.startswith("lm-studio/"):
+        return f"lm_studio/{normalized[len('lm-studio/') :]}"
+    return f"lm_studio/{normalized}"

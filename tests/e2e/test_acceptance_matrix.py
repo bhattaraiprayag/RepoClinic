@@ -161,7 +161,12 @@ def test_acceptance_partial_failure_produces_degraded_summary(tmp_path: Path) ->
             "--workspace-root",
             str(tmp_path / "workspace"),
         ],
-        env={"OPENAI_API_KEY": ""},
+        env={
+            "OPENAI_API_KEY": "",
+            "REPOCLINIC_DEFAULT_PROVIDER_PROFILE": "openai-default",
+            "LM_STUDIO_AUTH_TOKEN": "",
+            "LM_STUDIO_API_KEY": "",
+        },
     )
     assert result.exit_code == 0
     summary = _load_summary(output_dir / "summary.json")

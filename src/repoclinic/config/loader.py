@@ -53,8 +53,9 @@ def _apply_lmstudio_env_overrides(
     lm_profile = profiles.get("lm-studio-default")
     if not isinstance(lm_profile, dict):
         return
-    if env.get("LM_STUDIO_BASE_URL"):
-        lm_profile["base_url"] = env["LM_STUDIO_BASE_URL"]
+    base_url_override = env.get("LM_STUDIO_BASE_URL") or env.get("LM_STUDIO_API_BASE")
+    if base_url_override:
+        lm_profile["base_url"] = base_url_override
     if env.get("LM_STUDIO_MODEL"):
         lm_profile["model"] = env["LM_STUDIO_MODEL"]
     if env.get("LM_STUDIO_API_KEY_ENV"):

@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - LM Studio provider integration now enforces env-driven auth token usage, normalizes OpenAI-compatible base URLs, and supports env overrides for base URL/model.
+- LM Studio config/model normalization now standardizes `lm_studio/` model prefixes, accepts `LM_STUDIO_API_BASE`, and supports `LM_STUDIO_API_KEY` as a compatibility alias.
 - `.env.example` now includes LM Studio runtime variables and default provider profile guidance.
 - Runtime dependencies now include `litellm` to support CrewAI LLM instantiation for provider-backed branch execution.
 - Flow runner now exposes artifact materialization from persisted ARC-FL2 state to support post-flow report generation and resume workflows.

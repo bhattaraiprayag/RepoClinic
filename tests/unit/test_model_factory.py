@@ -95,3 +95,12 @@ def test_lmstudio_base_url_is_normalized(monkeypatch: pytest.MonkeyPatch) -> Non
     llm = factory.create_llm(env={"LM_STUDIO_AUTH_TOKEN": "token-value"})
     assert llm.kwargs["base_url"] == "http://127.0.0.1:1234/v1"
     assert llm.kwargs["api_key"] == "token-value"
+    assert llm.kwargs["model"] == "lm_studio/qwen/qwen3-vl-30b"
+
+
+def test_lmstudio_api_key_alias_is_supported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Factory should accept LM_STUDIO_API_KEY as LiteLLM-compatible alias."""
+    monkeypatch.setattr(model_factory_module, "LLM", _FakeLLM)
+    factory = ModelFactory(_build_lmstudio_config())
+    llm = factory.create_llm(env={"LM_STUDIO_API_KEY": "token-value"})
+    assert llm.kwargs["api_key"] == "token-value"
