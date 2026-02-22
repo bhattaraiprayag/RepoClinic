@@ -4,13 +4,15 @@ RepoClinic is a deterministic, stateful CrewAI flow pipeline for repository anal
 
 ### Current implementation scope
 
-This repository currently implements phases 0-5 from `planner-docs/5-IMPLEMENTATION-PLAN.md`:
+This repository currently implements phases 0-7 from `planner-docs/5-IMPLEMENTATION-PLAN.md`:
 - engineering baseline and governance
 - canonical schema contracts
 - central YAML config and model factory
 - deterministic scanner/evidence pipeline
 - ARC-FL2 stateful flow orchestration with checkpointed fan-out/fan-in
 - branch analyzers for architecture/security/performance and roadmap trigger synthesis
+- phase-6 artifact assembly for `summary.json` and `report.md`
+- phase-7 operator CLI with `analyze`, `resume`, and `validate-config` commands
 
 ### LM Studio setup note
 

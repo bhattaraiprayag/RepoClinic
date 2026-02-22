@@ -18,6 +18,12 @@ from repoclinic.agents import (
     build_failed_security_output,
     synthesize_roadmap,
 )
+from repoclinic.artifacts import (
+    GeneratedArtifacts,
+    build_report_markdown,
+    build_summary_json,
+    write_artifacts,
+)
 from repoclinic.config import ModelFactory, load_app_config
 from repoclinic.config.models import AppConfig
 from repoclinic.flow.state import RepoClinicFlowState
@@ -29,6 +35,7 @@ from repoclinic.schemas.analysis_models import (
 )
 from repoclinic.schemas.enums import FlowNodeState
 from repoclinic.schemas.input_models import AnalyzeRequest
+from repoclinic.schemas.output_models import RoadmapItem
 from repoclinic.schemas.scanner_models import ScannerOutput
 from repoclinic.scanner.pipeline import ScannerPipeline
 
@@ -337,6 +344,87 @@ class RepoClinicFlowRunner:
         flow = self._build_flow(provider_profile=provider_profile, branch_executor=branch_executor)
         flow.kickoff(inputs={"id": run_id})
         return flow.state
+
+    def materialize_artifacts(
+        self,
+        *,
+        state: RepoClinicFlowState,
+        output_dir: Path,
+    ) -> GeneratedArtifacts:
+        """Build and write phase-6 output artifacts from flow state."""
+        if not state.scanner_output:
+            raise ValueError("Cannot generate artifacts without scanner output")
+
+        run_id = state.run_id or state.id
+        scanner_output = ScannerOutput.model_validate(state.scanner_output)
+        architecture_output = (
+            ArchitectureAgentOutput.model_validate(state.architecture_output)
+            if state.architecture_output
+            else build_failed_architecture_output(
+                run_id=run_id,
+                schema_version=state.schema_version,
+                reason=state.branch_failures.get(
+                    "architecture", "architecture branch output missing"
+                ),
+            )
+        )
+        security_output = (
+            SecurityAgentOutput.model_validate(state.security_output)
+            if state.security_output
+            else build_failed_security_output(
+                run_id=run_id,
+                schema_version=state.schema_version,
+                reason=state.branch_failures.get("security", "security branch output missing"),
+            )
+        )
+        performance_output = (
+            PerformanceAgentOutput.model_validate(state.performance_output)
+            if state.performance_output
+            else build_failed_performance_output(
+                run_id=run_id,
+                schema_version=state.schema_version,
+                reason=state.branch_failures.get(
+                    "performance", "performance branch output missing"
+                ),
+            )
+        )
+        roadmap_items_payload: list[dict[str, Any]] = []
+        if state.roadmap_output:
+            raw_items = state.roadmap_output.get("items", [])
+            if isinstance(raw_items, list):
+                roadmap_items_payload = [item for item in raw_items if isinstance(item, dict)]
+        roadmap_items = [
+            RoadmapItem.model_validate(item)
+            for item in roadmap_items_payload
+        ]
+        if not roadmap_items:
+            roadmap_items = synthesize_roadmap(
+                architecture_output=architecture_output,
+                security_output=security_output,
+                performance_output=performance_output,
+            )
+        summary = build_summary_json(
+            schema_version=state.schema_version,
+            run_id=run_id,
+            scanner_output=scanner_output,
+            architecture_output=architecture_output,
+            security_output=security_output,
+            performance_output=performance_output,
+            roadmap_items=roadmap_items,
+            branch_statuses=dict(state.branch_statuses),
+        )
+        report_markdown = build_report_markdown(
+            scanner_output=scanner_output,
+            architecture_output=architecture_output,
+            security_output=security_output,
+            performance_output=performance_output,
+            roadmap_items=roadmap_items,
+        )
+        return write_artifacts(
+            output_dir=output_dir,
+            summary=summary,
+            report_markdown=report_markdown,
+        )
 
     def _build_flow(
         self,

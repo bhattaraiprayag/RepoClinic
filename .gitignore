@@ -12,6 +12,6 @@ wheels/
 .venv
 
 # Runtime artifacts
-artifacts/
+/artifacts/
 .sqlite/
 .env
