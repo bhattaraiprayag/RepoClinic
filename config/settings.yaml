@@ -1,0 +1,57 @@
+schema_version: "1.0.0"
+default_provider_profile: "openai-default"
+provider_profiles:
+  openai-default:
+    provider_type: "openai"
+    model: "gpt-4.1"
+    api_key_env: "OPENAI_API_KEY"
+    temperature: 0.1
+    seed: 42
+    max_tokens: 4096
+    timeout_seconds: 600
+    capabilities:
+      context_window: 128000
+      supports_structured_output: true
+      retries: 3
+  lm-studio-default:
+    provider_type: "lm_studio"
+    model: "qwen3-next-80b-a3b-thinking-mlx"
+    base_url: "http://192.168.1.70:1234/v1"
+    temperature: 0.1
+    seed: 42
+    max_tokens: 4096
+    timeout_seconds: 600
+    capabilities:
+      context_window: 16384
+      supports_structured_output: true
+      retries: 2
+retries:
+  max_attempts: 3
+  backoff_seconds: 1.0
+timeouts:
+  scanner_seconds: 900
+  agent_seconds: 600
+token_budgets:
+  scanner_context: 8000
+  architecture_context: 6000
+  security_context: 6000
+  performance_context: 6000
+  roadmap_context: 6000
+feature_flags:
+  enable_tree_sitter: true
+  enable_bandit: true
+  enable_semgrep: true
+  enable_osv: true
+scan_policy:
+  include_globs:
+    - "**/*"
+  exclude_globs:
+    - ".git/**"
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - ".venv/**"
+    - "__pycache__/**"
+    - "vendor/**"
+  max_file_size_bytes: 1000000
+  max_files: 25000
