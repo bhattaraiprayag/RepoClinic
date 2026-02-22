@@ -14,22 +14,24 @@ def _write_env(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def test_load_runtime_env_reads_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+def test_load_runtime_env_reads_dotenv(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
     """Runtime loader should populate env vars from .env when present."""
     _write_env(
         tmp_path / ".env",
-        "LM_STUDIO_AUTH_TOKEN=from-dotenv\nLANGFUSE_HOST=http://localhost:3000\n",
+        "LM_STUDIO_AUTH_TOKEN=from-dotenv\nLANGFUSE_BASE_URL=https://cloud.langfuse.com\n",
     )
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("LM_STUDIO_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("LANGFUSE_HOST", raising=False)
+    monkeypatch.delenv("LANGFUSE_BASE_URL", raising=False)
     monkeypatch.delenv("REPOCLINIC_DISABLE_DOTENV", raising=False)
 
     loaded = load_runtime_env()
 
     assert loaded is True
     assert os.environ["LM_STUDIO_AUTH_TOKEN"] == "from-dotenv"
-    assert os.environ["LANGFUSE_HOST"] == "http://localhost:3000"
+    assert os.environ["LANGFUSE_BASE_URL"] == "https://cloud.langfuse.com"
 
 
 def test_load_runtime_env_does_not_override_existing(
@@ -47,7 +49,9 @@ def test_load_runtime_env_does_not_override_existing(
     assert os.environ["LM_STUDIO_AUTH_TOKEN"] == "from-shell"
 
 
-def test_load_runtime_env_can_be_disabled(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+def test_load_runtime_env_can_be_disabled(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
     """Runtime loader should no-op when explicit disable flag is set."""
     _write_env(tmp_path / ".env", "LM_STUDIO_AUTH_TOKEN=from-dotenv\n")
     monkeypatch.chdir(tmp_path)

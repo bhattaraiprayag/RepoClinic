@@ -22,7 +22,10 @@ def _scanner_output() -> ScannerOutput:
             repo_name="sample_repo",
             languages_detected=["Python", "JavaScript"],
             frameworks_detected=["FastAPI", "Express"],
-            architecture_hints=["layered-service-structure", "route-controller-pattern"],
+            architecture_hints=[
+                "layered-service-structure",
+                "route-controller-pattern",
+            ],
             entry_points=["app.py"],
             manifests=["package.json", "requirements.txt"],
         ),

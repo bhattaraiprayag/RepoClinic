@@ -66,7 +66,8 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
         persistence: FlowPersistence | None = None,
     ) -> None:
         super().__init__(
-            persistence=persistence or SQLiteFlowPersistence(db_path=".sqlite/repoclinic.db"),
+            persistence=persistence
+            or SQLiteFlowPersistence(db_path=".sqlite/repoclinic.db"),
             suppress_flow_events=False,
         )
         self.config = config
@@ -94,6 +95,12 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
         self.state.provider_profile = (
             self.state.provider_profile or self.config.default_provider_profile
         )
+        self.tracer.record_stage(
+            run_id=self.state.run_id,
+            stage="start",
+            metadata={"status": "running"},
+            input_payload=request.model_dump(mode="json"),
+        )
         self._mark_node_transition(
             node_id="start",
             to_state=FlowNodeState.COMPLETED,
@@ -106,6 +113,7 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
                 "provider_profile": self.state.provider_profile or "unknown",
                 "status": "completed",
             },
+            output_payload={"run_id": self.state.run_id},
         )
         return {"run_id": self.state.run_id}
 
@@ -120,8 +128,14 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             to_state=FlowNodeState.RUNNING,
             reason="Executing scanner stage",
         )
+        request = AnalyzeRequest.model_validate(self.state.request_payload)
+        self.tracer.record_stage(
+            run_id=self.state.run_id,
+            stage="scanner",
+            metadata={"status": "running"},
+            input_payload=request.model_dump(mode="json"),
+        )
         try:
-            request = AnalyzeRequest.model_validate(self.state.request_payload)
             scanner_output = self.retry_executor.run(
                 lambda: self.scanner_pipeline.run(request),
                 stage_name="scanner-stage",
@@ -138,6 +152,7 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
                 run_id=self.state.run_id,
                 stage="scanner",
                 metadata={"status": "completed"},
+                output_payload=self.state.scanner_output,
             )
             return self.state.scanner_output
         except Exception as exc:
@@ -153,6 +168,7 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
                 run_id=self.state.run_id,
                 stage="scanner",
                 metadata={"status": "failed", "error": redacted_error},
+                output_payload={"error": redacted_error},
             )
             raise
 
@@ -167,6 +183,12 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             reason="Executing architecture branch",
         )
         scanner_output = ScannerOutput.model_validate(self.state.scanner_output or {})
+        self.tracer.record_stage(
+            run_id=self.state.run_id,
+            stage="architecture",
+            metadata={"status": "running"},
+            input_payload=scanner_output.model_dump(mode="json"),
+        )
         try:
             output = self.retry_executor.run(
                 lambda: self.branch_executor.run_architecture(scanner_output),
@@ -188,11 +210,19 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             node_state = FlowNodeState.FAILED
             reason = f"Architecture branch failed: {redacted_error}"
         self.state.architecture_output = output.model_dump(mode="json")
-        self._mark_node_transition(node_id="architecture", to_state=node_state, reason=reason)
+        self._mark_node_transition(
+            node_id="architecture", to_state=node_state, reason=reason
+        )
+        architecture_metadata: dict[str, Any] = {
+            "status": self.state.branch_statuses["architecture"]
+        }
+        if self.state.branch_statuses["architecture"] == "failed":
+            architecture_metadata["error"] = self.state.branch_failures["architecture"]
         self.tracer.record_stage(
             run_id=self.state.run_id,
             stage="architecture",
-            metadata={"status": self.state.branch_statuses["architecture"]},
+            metadata=architecture_metadata,
+            output_payload=self.state.architecture_output,
         )
         return self.state.architecture_output
 
@@ -207,6 +237,12 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             reason="Executing security branch",
         )
         scanner_output = ScannerOutput.model_validate(self.state.scanner_output or {})
+        self.tracer.record_stage(
+            run_id=self.state.run_id,
+            stage="security",
+            metadata={"status": "running"},
+            input_payload=scanner_output.model_dump(mode="json"),
+        )
         try:
             output = self.retry_executor.run(
                 lambda: self.branch_executor.run_security(scanner_output),
@@ -228,11 +264,19 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             node_state = FlowNodeState.FAILED
             reason = f"Security branch failed: {redacted_error}"
         self.state.security_output = output.model_dump(mode="json")
-        self._mark_node_transition(node_id="security", to_state=node_state, reason=reason)
+        self._mark_node_transition(
+            node_id="security", to_state=node_state, reason=reason
+        )
+        security_metadata: dict[str, Any] = {
+            "status": self.state.branch_statuses["security"]
+        }
+        if self.state.branch_statuses["security"] == "failed":
+            security_metadata["error"] = self.state.branch_failures["security"]
         self.tracer.record_stage(
             run_id=self.state.run_id,
             stage="security",
-            metadata={"status": self.state.branch_statuses["security"]},
+            metadata=security_metadata,
+            output_payload=self.state.security_output,
         )
         return self.state.security_output
 
@@ -247,6 +291,12 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             reason="Executing performance branch",
         )
         scanner_output = ScannerOutput.model_validate(self.state.scanner_output or {})
+        self.tracer.record_stage(
+            run_id=self.state.run_id,
+            stage="performance",
+            metadata={"status": "running"},
+            input_payload=scanner_output.model_dump(mode="json"),
+        )
         try:
             output = self.retry_executor.run(
                 lambda: self.branch_executor.run_performance(scanner_output),
@@ -268,11 +318,19 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             node_state = FlowNodeState.FAILED
             reason = f"Performance branch failed: {redacted_error}"
         self.state.performance_output = output.model_dump(mode="json")
-        self._mark_node_transition(node_id="performance", to_state=node_state, reason=reason)
+        self._mark_node_transition(
+            node_id="performance", to_state=node_state, reason=reason
+        )
+        performance_metadata: dict[str, Any] = {
+            "status": self.state.branch_statuses["performance"]
+        }
+        if self.state.branch_statuses["performance"] == "failed":
+            performance_metadata["error"] = self.state.branch_failures["performance"]
         self.tracer.record_stage(
             run_id=self.state.run_id,
             stage="performance",
-            metadata={"status": self.state.branch_statuses["performance"]},
+            metadata=performance_metadata,
+            output_payload=self.state.performance_output,
         )
         return self.state.performance_output
 
@@ -287,11 +345,23 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
             to_state=FlowNodeState.RUNNING,
             reason="Executing roadmap synthesis trigger",
         )
+        self.tracer.record_stage(
+            run_id=self.state.run_id,
+            stage="roadmap",
+            metadata={"status": "running"},
+            input_payload={
+                "architecture": self.state.architecture_output,
+                "security": self.state.security_output,
+                "performance": self.state.performance_output,
+            },
+        )
         try:
             architecture_output = ArchitectureAgentOutput.model_validate(
                 self.state.architecture_output or {}
             )
-            security_output = SecurityAgentOutput.model_validate(self.state.security_output or {})
+            security_output = SecurityAgentOutput.model_validate(
+                self.state.security_output or {}
+            )
             performance_output = PerformanceAgentOutput.model_validate(
                 self.state.performance_output or {}
             )
@@ -304,7 +374,9 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
                 self.state.branch_statuses.get(branch) == "failed"
                 for branch in ("architecture", "security", "performance")
             )
-            self.state.branch_statuses["roadmap"] = "degraded" if degraded else "completed"
+            self.state.branch_statuses["roadmap"] = (
+                "degraded" if degraded else "completed"
+            )
             self.state.roadmap_output = {
                 "schema_version": self.state.schema_version,
                 "run_id": self.state.run_id,
@@ -321,6 +393,7 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
                 run_id=self.state.run_id,
                 stage="roadmap",
                 metadata={"status": self.state.branch_statuses["roadmap"]},
+                output_payload=self.state.roadmap_output,
             )
             return self.state.roadmap_output
         except Exception as exc:
@@ -343,6 +416,7 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
                 run_id=self.state.run_id,
                 stage="roadmap",
                 metadata={"status": "failed", "error": redacted_error},
+                output_payload=self.state.roadmap_output,
             )
             return self.state.roadmap_output
 
@@ -356,15 +430,20 @@ class RepoClinicFlow(Flow[RepoClinicFlowState]):
         to_state: FlowNodeState,
         reason: str,
     ) -> None:
-        from_state = self.state.state.value if hasattr(self.state.state, "value") else str(
-            self.state.state
+        from_state = (
+            self.state.state.value
+            if hasattr(self.state.state, "value")
+            else str(self.state.state)
         )
         self.state.flow_id = self.flow_id
         self.state.node_id = node_id
         self.state.state = to_state
         self.state.checkpoint_id = f"{self.state.run_id}:{node_id}"
         self.state.resume_token = self.state.id
-        if to_state == FlowNodeState.COMPLETED and node_id not in self.state.completed_nodes:
+        if (
+            to_state == FlowNodeState.COMPLETED
+            and node_id not in self.state.completed_nodes
+        ):
             self.state.completed_nodes.append(node_id)
         self.transition_store.record_transition(
             run_id=self.state.run_id or self.state.id,
@@ -401,7 +480,9 @@ class RepoClinicFlowRunner:
         self.db_path = db_path or Path(".sqlite/repoclinic.db")
         self.workspace_root = workspace_root or Path(".scanner-workspace")
         self.manifest_store = RunManifestStore(self.db_path)
-        self.manifest_collector = RunManifestCollector(workspace_root=self.workspace_root)
+        self.manifest_collector = RunManifestCollector(
+            workspace_root=self.workspace_root
+        )
         self.tracer = create_tracer(self.env)
 
     def kickoff(
@@ -412,7 +493,9 @@ class RepoClinicFlowRunner:
         branch_executor: BranchExecutor | None = None,
     ) -> RepoClinicFlowState:
         """Kick off a new flow run."""
-        flow = self._build_flow(provider_profile=provider_profile, branch_executor=branch_executor)
+        flow = self._build_flow(
+            provider_profile=provider_profile, branch_executor=branch_executor
+        )
         resolved_profile = provider_profile or self.config.default_provider_profile
         self.tracer.start_run(
             run_id=request.run_id,
@@ -420,6 +503,7 @@ class RepoClinicFlowRunner:
                 "provider_profile": resolved_profile,
                 "source_type": request.input.source_type,
             },
+            input_payload=request.model_dump(mode="json"),
         )
         flow.kickoff(
             inputs={
@@ -437,7 +521,18 @@ class RepoClinicFlowRunner:
         )
         self.tracer.finish_run(
             run_id=request.run_id,
-            metadata={"analysis_status": redact_mapping(dict(flow.state.branch_statuses))},
+            metadata={
+                "analysis_status": redact_mapping(dict(flow.state.branch_statuses))
+            },
+            output_payload={
+                "branch_statuses": dict(flow.state.branch_statuses),
+                "branch_failures": dict(flow.state.branch_failures),
+                "roadmap_status": (
+                    flow.state.roadmap_output.get("status")
+                    if flow.state.roadmap_output
+                    else None
+                ),
+            },
         )
         self.tracer.flush()
         return flow.state
@@ -450,13 +545,17 @@ class RepoClinicFlowRunner:
         branch_executor: BranchExecutor | None = None,
     ) -> RepoClinicFlowState:
         """Resume an existing run by run_id checkpoint."""
-        flow = self._build_flow(provider_profile=provider_profile, branch_executor=branch_executor)
+        flow = self._build_flow(
+            provider_profile=provider_profile, branch_executor=branch_executor
+        )
         self.tracer.start_run(
             run_id=run_id,
             metadata={
-                "provider_profile": provider_profile or self.config.default_provider_profile,
+                "provider_profile": provider_profile
+                or self.config.default_provider_profile,
                 "resume": True,
             },
+            input_payload={"run_id": run_id, "resume": True},
         )
         flow.kickoff(inputs={"id": run_id})
         request = AnalyzeRequest.model_validate(flow.state.request_payload)
@@ -467,7 +566,18 @@ class RepoClinicFlowRunner:
         )
         self.tracer.finish_run(
             run_id=run_id,
-            metadata={"analysis_status": redact_mapping(dict(flow.state.branch_statuses))},
+            metadata={
+                "analysis_status": redact_mapping(dict(flow.state.branch_statuses))
+            },
+            output_payload={
+                "branch_statuses": dict(flow.state.branch_statuses),
+                "branch_failures": dict(flow.state.branch_failures),
+                "roadmap_status": (
+                    flow.state.roadmap_output.get("status")
+                    if flow.state.roadmap_output
+                    else None
+                ),
+            },
         )
         self.tracer.flush()
         return flow.state
@@ -501,7 +611,9 @@ class RepoClinicFlowRunner:
             else build_failed_security_output(
                 run_id=run_id,
                 schema_version=state.schema_version,
-                reason=state.branch_failures.get("security", "security branch output missing"),
+                reason=state.branch_failures.get(
+                    "security", "security branch output missing"
+                ),
             )
         )
         performance_output = (
@@ -519,10 +631,11 @@ class RepoClinicFlowRunner:
         if state.roadmap_output:
             raw_items = state.roadmap_output.get("items", [])
             if isinstance(raw_items, list):
-                roadmap_items_payload = [item for item in raw_items if isinstance(item, dict)]
+                roadmap_items_payload = [
+                    item for item in raw_items if isinstance(item, dict)
+                ]
         roadmap_items = [
-            RoadmapItem.model_validate(item)
-            for item in roadmap_items_payload
+            RoadmapItem.model_validate(item) for item in roadmap_items_payload
         ]
         if not roadmap_items:
             roadmap_items = synthesize_roadmap(

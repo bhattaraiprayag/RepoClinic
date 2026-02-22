@@ -50,7 +50,9 @@ class _FakeBranchExecutor(BranchExecutor):
         self.fail_security = fail_security
         self.calls = {"architecture": 0, "security": 0, "performance": 0}
 
-    def run_architecture(self, scanner_output: ScannerOutput) -> ArchitectureAgentOutput:
+    def run_architecture(
+        self, scanner_output: ScannerOutput
+    ) -> ArchitectureAgentOutput:
         self.calls["architecture"] += 1
         return self.impl.run_architecture(scanner_output)
 
@@ -88,7 +90,9 @@ def _build_config() -> AppConfig:
 
 
 def _retry_executor() -> RetryExecutor:
-    return RetryExecutor(RetryPolicy(max_attempts=1, backoff_seconds=0.0, jitter_seconds=0.0))
+    return RetryExecutor(
+        RetryPolicy(max_attempts=1, backoff_seconds=0.0, jitter_seconds=0.0)
+    )
 
 
 def _scanner_output(run_id: str) -> ScannerOutput:
@@ -202,7 +206,9 @@ def test_flow_fan_out_fan_in_and_transition_log(tmp_path: Path) -> None:
         and entry[2] in {"completed", "failed"}
     ]
     roadmap_running_index = next(
-        idx for idx, entry in enumerate(transitions) if entry[0] == "roadmap" and entry[2] == "running"
+        idx
+        for idx, entry in enumerate(transitions)
+        if entry[0] == "roadmap" and entry[2] == "running"
     )
     assert roadmap_running_index > max(branch_terminal_indexes)
 

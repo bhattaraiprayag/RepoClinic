@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from repoclinic.schemas.scanner_models import (
+    DependencySeverity,
     DependencyFinding,
     EvidenceItem,
     ScannerEvidenceSource,
@@ -57,7 +58,9 @@ def normalize_semgrep(payload: dict[str, Any]) -> list[EvidenceItem]:
             continue
         start_line = int(item.get("start", {}).get("line", 1))
         end_line = int(item.get("end", {}).get("line", start_line))
-        message = item.get("extra", {}).get("message") or item.get("check_id", "Semgrep finding")
+        message = item.get("extra", {}).get("message") or item.get(
+            "check_id", "Semgrep finding"
+        )
         evidence.append(
             _make_evidence(
                 file=file,
@@ -110,7 +113,9 @@ def normalize_osv(
             for vuln in package.get("vulnerabilities", []):
                 vuln_id = vuln.get("id", "unknown")
                 aliases = vuln.get("aliases", [])
-                severity = _normalize_dependency_severity(vuln.get("database_specific", {}).get("severity"))
+                severity = _normalize_dependency_severity(
+                    vuln.get("database_specific", {}).get("severity")
+                )
                 fixed_version = None
                 if vuln.get("affected"):
                     ranges = vuln["affected"][0].get("ranges", [])
@@ -147,13 +152,17 @@ def normalize_osv(
     return evidence, dependency_findings
 
 
-def _normalize_dependency_severity(raw: Any) -> str:
+def _normalize_dependency_severity(raw: Any) -> DependencySeverity:
+    severity_map: dict[str, DependencySeverity] = {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical",
+    }
     if not raw:
         return "Unknown"
-    normalized = str(raw).strip().capitalize()
-    if normalized in {"Low", "Medium", "High", "Critical"}:
-        return normalized
-    return "Unknown"
+    normalized = severity_map.get(str(raw).strip().lower())
+    return normalized or "Unknown"
 
 
 def _make_evidence(

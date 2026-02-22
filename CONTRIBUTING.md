@@ -10,6 +10,7 @@ Contributions are welcome through pull requests scoped to a single objective (fe
 uv venv
 source .venv/bin/activate
 uv sync
+uv run pre-commit install
 ```
 
 ## Engineering standards
@@ -38,8 +39,11 @@ Supported `type` values:
 
 ```bash
 make check
+make precommit
 make validate-config
 ```
+
+GitHub Actions CI (`.github/workflows/ci.yml`) runs the same quality gates on push and pull requests.
 
 If Docker paths were modified, also run:
 

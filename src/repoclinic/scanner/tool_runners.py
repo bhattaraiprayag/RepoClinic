@@ -62,7 +62,9 @@ class ToolRunners:
         success_codes: set[int],
     ) -> ToolRunResult:
         if shutil.which(tool_name) is None:
-            return ToolRunResult(status="unavailable", payload={}, error=f"{tool_name} not found")
+            return ToolRunResult(
+                status="unavailable", payload={}, error=f"{tool_name} not found"
+            )
 
         try:
             result = subprocess.run(
@@ -73,7 +75,9 @@ class ToolRunners:
                 timeout=self.timeout_seconds,
             )
         except subprocess.TimeoutExpired:
-            return ToolRunResult(status="failed", payload={}, error=f"{tool_name} timed out")
+            return ToolRunResult(
+                status="failed", payload={}, error=f"{tool_name} timed out"
+            )
 
         if result.returncode not in success_codes:
             return ToolRunResult(

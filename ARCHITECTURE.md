@@ -93,7 +93,7 @@ erDiagram
   - `summary.json`
   - `report.md`
 - **Observability surface**
-  - Langfuse SDK over `LANGFUSE_HOST`
+  - Langfuse SDK over `LANGFUSE_BASE_URL` (Langfuse Cloud endpoint)
 - **Toolchain dependencies**
   - `git`, `rg`, `semgrep`, `bandit`, `osv-scanner`
 

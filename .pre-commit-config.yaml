@@ -1,0 +1,45 @@
+repos:
+  # 1. Standard Housekeeping & Security
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # 2. Local Python Tools
+  - repo: local
+    hooks:
+      # Formatting
+      - id: ruff-format
+        name: ruff format (check)
+        entry: uv run ruff format --check
+        language: system
+        types_or: [python, pyi]
+
+      # Linting
+      - id: ruff-check
+        name: ruff lint
+        entry: uv run ruff check
+        language: system
+        types_or: [python, pyi]
+
+      # Type Checking
+      - id: mypy
+        name: mypy type check
+        entry: uv run mypy src/
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # Security Scanning
+      - id: bandit
+        name: bandit security check
+        entry: uv run bandit -c pyproject.toml -r src/ -ll
+        language: system
+        pass_filenames: false

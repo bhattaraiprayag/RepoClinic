@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 
 from repoclinic.scanner.inventory import FileRecord
 from repoclinic.schemas.scanner_models import FolderSummary, ManifestSummary
@@ -96,7 +95,12 @@ def summarize_manifests(files: list[FileRecord]) -> list[ManifestSummary]:
     summaries: list[ManifestSummary] = []
     for record in files:
         name = record.rel_path.name
-        if name not in {"package.json", "requirements.txt", "pyproject.toml", "pom.xml"}:
+        if name not in {
+            "package.json",
+            "requirements.txt",
+            "pyproject.toml",
+            "pom.xml",
+        }:
             continue
         ecosystem, dependency_count = _manifest_dependency_count(name, record.content)
         summaries.append(
@@ -146,7 +150,9 @@ def _manifest_dependency_count(filename: str, content: str) -> tuple[str, int]:
         dev_dependencies = payload.get("devDependencies", {})
         return "npm", len(dependencies) + len(dev_dependencies)
     if filename == "requirements.txt":
-        lines = [line for line in content.splitlines() if line and not line.startswith("#")]
+        lines = [
+            line for line in content.splitlines() if line and not line.startswith("#")
+        ]
         return "pip", len(lines)
     if filename == "pyproject.toml":
         count = len(re.findall(r'^\s*"[A-Za-z0-9_.\-]+', content, flags=re.MULTILINE))

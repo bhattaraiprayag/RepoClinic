@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from repoclinic.config.models import AppConfig
 from repoclinic.scanner.heuristics import (
@@ -26,6 +27,7 @@ from repoclinic.scanner.source_resolver import SourceResolver
 from repoclinic.scanner.tool_runners import ToolRunners
 from repoclinic.schemas.input_models import AnalyzeRequest
 from repoclinic.schemas.scanner_models import (
+    DependencyFinding,
     DependencySummary,
     RepoProfile,
     ScannerOutput,
@@ -66,9 +68,11 @@ class ScannerPipeline:
             entry_points=entry_points,
             manifests=manifest_paths,
         )
-        dependency_findings = []
+        dependency_findings: list[DependencyFinding] = []
 
-        tool_runners = ToolRunners(timeout_seconds=request.execution.timeouts.scanner_seconds)
+        tool_runners = ToolRunners(
+            timeout_seconds=request.execution.timeouts.scanner_seconds
+        )
         tool_statuses: list[str] = []
 
         if self._is_enabled(
@@ -80,12 +84,9 @@ class ScannerPipeline:
             if semgrep_result.status == "completed":
                 evidence.extend(normalize_semgrep(semgrep_result.payload))
 
-        if (
-            "Python" in languages
-            and self._is_enabled(
-                request.execution.feature_flags.enable_bandit,
-                self.config.feature_flags.enable_bandit,
-            )
+        if "Python" in languages and self._is_enabled(
+            request.execution.feature_flags.enable_bandit,
+            self.config.feature_flags.enable_bandit,
         ):
             bandit_result = tool_runners.run_bandit(resolved.resolved_path)
             tool_statuses.append(bandit_result.status)
@@ -135,7 +136,9 @@ class ScannerPipeline:
         return request_enabled and config_enabled
 
 
-def _resolve_dependency_status(tool_statuses: list[str]) -> str:
+def _resolve_dependency_status(
+    tool_statuses: list[str],
+) -> Literal["completed", "failed", "unavailable"]:
     if not tool_statuses:
         return "unavailable"
     if any(status == "failed" for status in tool_statuses):

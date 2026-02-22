@@ -150,7 +150,9 @@ def test_validate_config_lists_profiles(tmp_path: Path) -> None:
     """validate-config should load and print provider profiles."""
     config_path = _write_config(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(cli_module.app, ["validate-config", "--config", str(config_path)])
+    result = runner.invoke(
+        cli_module.app, ["validate-config", "--config", str(config_path)]
+    )
     assert result.exit_code == 0
     assert "openai-default" in result.stdout
     assert "lm_studio" in result.stdout

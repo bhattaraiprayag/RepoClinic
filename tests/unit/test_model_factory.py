@@ -11,7 +11,9 @@ from repoclinic.config.model_factory import ModelFactory
 from repoclinic.config.models import AppConfig
 
 
-def _build_openai_config(max_tokens: int = 1024, context_window: int = 4096) -> AppConfig:
+def _build_openai_config(
+    max_tokens: int = 1024, context_window: int = 4096
+) -> AppConfig:
     return AppConfig.model_validate(
         {
             "schema_version": "1.0.0",

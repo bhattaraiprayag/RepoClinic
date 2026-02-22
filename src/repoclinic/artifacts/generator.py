@@ -17,6 +17,8 @@ from repoclinic.schemas.enums import FindingStatus, Priority, Severity
 from repoclinic.schemas.output_models import (
     AnalysisStatus,
     RoadmapItem,
+    ScannerStageStatus,
+    StageStatus,
     SummaryJson,
     SummaryRiskItem,
     SummaryRoadmapItem,
@@ -199,7 +201,9 @@ def write_artifacts(
     summary_path = output_dir / "summary.json"
     report_path = output_dir / "report.md"
 
-    summary_bytes = orjson.dumps(summary.model_dump(mode="json"), option=orjson.OPT_INDENT_2)
+    summary_bytes = orjson.dumps(
+        summary.model_dump(mode="json"), option=orjson.OPT_INDENT_2
+    )
     summary_path.write_bytes(summary_bytes + b"\n")
     report_path.write_text(report_markdown, encoding="utf-8")
 
@@ -211,15 +215,17 @@ def write_artifacts(
     )
 
 
-def _normalize_stage_status(value: str | None) -> str:
-    if value in {"completed", "failed", "degraded"}:
-        return value
+def _normalize_stage_status(value: str | None) -> StageStatus:
+    if value == "completed":
+        return "completed"
+    if value == "degraded":
+        return "degraded"
     return "failed"
 
 
-def _normalize_scanner_status(value: str | None) -> str:
-    if value in {"completed", "failed"}:
-        return value
+def _normalize_scanner_status(value: str | None) -> ScannerStageStatus:
+    if value == "completed":
+        return "completed"
     return "failed"
 
 

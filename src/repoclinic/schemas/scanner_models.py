@@ -95,7 +95,9 @@ class DependencySummary(StrictSchemaModel):
     """Dependency summary plus scan status."""
 
     manifests: list[ManifestSummary] = Field(default_factory=list)
-    vulnerability_scan_status: Literal["completed", "failed", "unavailable"] = "unavailable"
+    vulnerability_scan_status: Literal["completed", "failed", "unavailable"] = (
+        "unavailable"
+    )
     vulnerability_findings: list[DependencyFinding] = Field(default_factory=list)
 
 

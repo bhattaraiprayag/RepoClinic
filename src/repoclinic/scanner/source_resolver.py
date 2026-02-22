@@ -51,8 +51,17 @@ class SourceResolver:
                 source_type=source.source_type,
             )
 
-        clone_cmd = ["git", "clone", "--depth", "1", source.github_url, str(destination)]
-        clone_result = subprocess.run(clone_cmd, capture_output=True, text=True, check=False)
+        clone_cmd = [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            source.github_url,
+            str(destination),
+        ]
+        clone_result = subprocess.run(
+            clone_cmd, capture_output=True, text=True, check=False
+        )
         if clone_result.returncode != 0:
             raise RuntimeError(f"git clone failed: {clone_result.stderr.strip()}")
 
@@ -62,7 +71,9 @@ class SourceResolver:
                 branch_cmd, capture_output=True, text=True, check=False
             )
             if branch_result.returncode != 0:
-                raise RuntimeError(f"git checkout branch failed: {branch_result.stderr.strip()}")
+                raise RuntimeError(
+                    f"git checkout branch failed: {branch_result.stderr.strip()}"
+                )
 
         if source.commit:
             commit_cmd = ["git", "-C", str(destination), "checkout", source.commit]
@@ -70,7 +81,9 @@ class SourceResolver:
                 commit_cmd, capture_output=True, text=True, check=False
             )
             if commit_result.returncode != 0:
-                raise RuntimeError(f"git checkout commit failed: {commit_result.stderr.strip()}")
+                raise RuntimeError(
+                    f"git checkout commit failed: {commit_result.stderr.strip()}"
+                )
 
         return ResolvedSource(
             repo_name=repo_name,

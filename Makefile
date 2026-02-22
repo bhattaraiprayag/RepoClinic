@@ -11,15 +11,13 @@ BRANCH_EXECUTOR ?= heuristic
 REPO_PATH ?=
 REPO_URL ?=
 RUN_ID ?=
-LANGFUSE_COMPOSE_FILE ?= docker-compose.langfuse.yml
-LANGFUSE_ENV_FILE ?= .env.langfuse
 
 .PHONY: \
 	help venv sync clean \
-	format lint test check \
+	format lint test check precommit \
 	validate-config analyze-local analyze-remote resume healthcheck \
 	docker-build docker-analyze-local docker-analyze-remote docker-healthcheck \
-	langfuse-env langfuse-up langfuse-logs langfuse-down langfuse-keys
+	langfuse-cloud-check
 
 help:
 	@echo "RepoClinic developer targets"
@@ -29,6 +27,7 @@ help:
 	@echo "  lint                  Lint src/tests with ruff"
 	@echo "  test                  Run pytest"
 	@echo "  check                 Run lint + tests"
+	@echo "  precommit             Run pre-commit checks on all files"
 	@echo "  validate-config       Validate config/settings.yaml"
 	@echo "  analyze-local         Analyze local repo (REPO_PATH required)"
 	@echo "  analyze-remote        Analyze GitHub repo URL (REPO_URL required)"
@@ -38,11 +37,7 @@ help:
 	@echo "  docker-analyze-local  Analyze local repo via Docker (REPO_PATH required)"
 	@echo "  docker-analyze-remote Analyze GitHub repo via Docker (REPO_URL required)"
 	@echo "  docker-healthcheck    Run healthcheck inside Docker image"
-	@echo "  langfuse-env          Create .env.langfuse from template if missing"
-	@echo "  langfuse-up           Start local Langfuse stack"
-	@echo "  langfuse-logs         Tail Langfuse logs"
-	@echo "  langfuse-down         Stop local Langfuse stack"
-	@echo "  langfuse-keys         Show headless init keys from .env.langfuse"
+	@echo "  langfuse-cloud-check  Verify required Langfuse Cloud vars exist in .env"
 
 venv:
 	$(UV) venv
@@ -51,15 +46,18 @@ sync: venv
 	$(UV) sync
 
 format:
-	uvx ruff format src tests
+	$(UV) run ruff format src tests
 
 lint:
-	uvx ruff check src tests
+	$(UV) run ruff check src tests
 
 test:
 	$(UV) run pytest
 
 check: lint test
+
+precommit:
+	$(UV) run pre-commit run --all-files
 
 validate-config:
 	$(UV) run repoclinic validate-config --config "$(CONFIG)"
@@ -95,20 +93,12 @@ docker-analyze-remote:
 docker-healthcheck:
 	docker run --rm --env-file .env "$(DOCKER_IMAGE)" healthcheck --quiet
 
-langfuse-env:
-	@if [ ! -f "$(LANGFUSE_ENV_FILE)" ]; then cp .env.langfuse.example "$(LANGFUSE_ENV_FILE)"; echo "Created $(LANGFUSE_ENV_FILE). Update secrets before use."; fi
-
-langfuse-up: langfuse-env
-	docker compose --env-file "$(LANGFUSE_ENV_FILE)" -f "$(LANGFUSE_COMPOSE_FILE)" up -d
-
-langfuse-logs:
-	docker compose --env-file "$(LANGFUSE_ENV_FILE)" -f "$(LANGFUSE_COMPOSE_FILE)" logs -f --tail=200
-
-langfuse-down:
-	docker compose --env-file "$(LANGFUSE_ENV_FILE)" -f "$(LANGFUSE_COMPOSE_FILE)" down
-
-langfuse-keys: langfuse-env
-	@grep -E '^LANGFUSE_INIT_PROJECT_(PUBLIC|SECRET)_KEY=' "$(LANGFUSE_ENV_FILE)" || true
+langfuse-cloud-check:
+	@if [ ! -f ".env" ]; then echo ".env not found. Copy .env.example to .env first."; exit 1; fi
+	@grep -q '^LANGFUSE_PUBLIC_KEY=' .env || (echo "Missing LANGFUSE_PUBLIC_KEY in .env"; exit 1)
+	@grep -q '^LANGFUSE_SECRET_KEY=' .env || (echo "Missing LANGFUSE_SECRET_KEY in .env"; exit 1)
+	@grep -q '^LANGFUSE_BASE_URL=' .env || (echo "Missing LANGFUSE_BASE_URL in .env"; exit 1)
+	@echo "Langfuse Cloud variables detected in .env"
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache

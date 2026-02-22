@@ -23,8 +23,14 @@ from repoclinic.schemas.analysis_models import (
     SecurityAgentOutput,
     SecurityRisk,
 )
-from repoclinic.schemas.enums import ArchitectureType, FindingCategory, FindingStatus, Severity
-from repoclinic.schemas.output_models import RoadmapItem
+from repoclinic.schemas.enums import (
+    ArchitectureType,
+    FindingCategory,
+    FindingStatus,
+    Priority,
+    Severity,
+)
+from repoclinic.schemas.output_models import RoadmapItem, TimelineBucket
 from repoclinic.schemas.scanner_models import EvidenceItem, ScannerOutput
 
 MODEL_T = TypeVar("MODEL_T", bound=BaseModel)
@@ -40,7 +46,9 @@ SEVERITY_ORDER = {
 class BranchExecutor(Protocol):
     """Branch execution contract."""
 
-    def run_architecture(self, scanner_output: ScannerOutput) -> ArchitectureAgentOutput:
+    def run_architecture(
+        self, scanner_output: ScannerOutput
+    ) -> ArchitectureAgentOutput:
         """Run architecture branch analysis."""
 
     def run_security(self, scanner_output: ScannerOutput) -> SecurityAgentOutput:
@@ -53,7 +61,9 @@ class BranchExecutor(Protocol):
 class HeuristicBranchExecutor:
     """Deterministic evidence-driven branch analyzer."""
 
-    def run_architecture(self, scanner_output: ScannerOutput) -> ArchitectureAgentOutput:
+    def run_architecture(
+        self, scanner_output: ScannerOutput
+    ) -> ArchitectureAgentOutput:
         architecture_type = _infer_architecture_type(scanner_output)
         module_boundaries = [
             ModuleBoundary(
@@ -66,11 +76,15 @@ class HeuristicBranchExecutor:
         runtime_summary = _runtime_flow_summary(scanner_output)
 
         findings: list[BaseFinding] = []
-        evidence_item = _first_evidence(scanner_output, {"entrypoint", "route", "config"})
+        evidence_item = _first_evidence(
+            scanner_output, {"entrypoint", "route", "config"}
+        )
         if evidence_item:
             findings.append(
                 BaseFinding(
-                    id=_finding_id("architecture", evidence_item.file, evidence_item.summary),
+                    id=_finding_id(
+                        "architecture", evidence_item.file, evidence_item.summary
+                    ),
                     category=FindingCategory.ARCHITECTURE,
                     title="Detected runtime entrypoint and module layering",
                     description=(
@@ -88,7 +102,9 @@ class HeuristicBranchExecutor:
         else:
             findings.append(
                 BaseFinding(
-                    id=_finding_id("architecture", scanner_output.repo_profile.repo_name, "unknown"),
+                    id=_finding_id(
+                        "architecture", scanner_output.repo_profile.repo_name, "unknown"
+                    ),
                     category=FindingCategory.ARCHITECTURE,
                     title="Insufficient architecture evidence",
                     description=(
@@ -148,7 +164,9 @@ class HeuristicBranchExecutor:
         if not findings:
             findings.append(
                 BaseFinding(
-                    id=_finding_id("security", scanner_output.repo_profile.repo_name, "none"),
+                    id=_finding_id(
+                        "security", scanner_output.repo_profile.repo_name, "none"
+                    ),
                     category=FindingCategory.SECURITY,
                     title="No deterministic security evidence found",
                     description="No semgrep/bandit/osv/secret evidence was available for confirmation.",
@@ -204,7 +222,9 @@ class HeuristicBranchExecutor:
             if route_evidence:
                 findings.append(
                     BaseFinding(
-                        id=_finding_id("performance", route_evidence.file, "api-pagination"),
+                        id=_finding_id(
+                            "performance", route_evidence.file, "api-pagination"
+                        ),
                         category=FindingCategory.PERFORMANCE,
                         title="API pagination and caching require review",
                         description="API surface detected; pagination/caching guarantees are not yet evidenced.",
@@ -226,14 +246,18 @@ class HeuristicBranchExecutor:
             else:
                 findings.append(
                     BaseFinding(
-                        id=_finding_id("performance", scanner_output.repo_profile.repo_name, "none"),
+                        id=_finding_id(
+                            "performance", scanner_output.repo_profile.repo_name, "none"
+                        ),
                         category=FindingCategory.PERFORMANCE,
                         title="Insufficient performance evidence",
                         description="No deterministic performance hotspots were detected.",
                         severity=Severity.LOW,
                         status=FindingStatus.INSUFFICIENT_EVIDENCE,
                         confidence=0.3,
-                        symptoms=["No clear bottlenecks identified from current evidence"],
+                        symptoms=[
+                            "No clear bottlenecks identified from current evidence"
+                        ],
                         recommendation="Expand scanner heuristics for query and I/O hotspot detection.",
                     )
                 )
@@ -264,7 +288,9 @@ class CrewBranchExecutor:
         profile = self.model_factory.get_profile(provider_profile)
         self._token_budgeter = TokenBudgeter(profile.model)
 
-    def run_architecture(self, scanner_output: ScannerOutput) -> ArchitectureAgentOutput:
+    def run_architecture(
+        self, scanner_output: ScannerOutput
+    ) -> ArchitectureAgentOutput:
         task_description = (
             "Analyze repository scanner evidence and return ArchitectureAgentOutput JSON. "
             "Use only supplied evidence and include confidence and citations."
@@ -288,8 +314,12 @@ class CrewBranchExecutor:
             "Analyze scanner security evidence and return SecurityAgentOutput JSON. "
             "Report only evidence-linked risks with explicit severity and fixes."
         )
-        expected = "Structured SecurityAgentOutput with top security risks and findings."
-        context = self._serialize_context(scanner_output, self.config.token_budgets.security_context)
+        expected = (
+            "Structured SecurityAgentOutput with top security risks and findings."
+        )
+        context = self._serialize_context(
+            scanner_output, self.config.token_budgets.security_context
+        )
         output = self._run_task(
             role="Security Risk Agent",
             goal="Identify concrete security risks and remediation guidance from repository evidence.",
@@ -305,7 +335,9 @@ class CrewBranchExecutor:
             "Analyze scanner performance evidence and return PerformanceAgentOutput JSON. "
             "Prioritize scalability bottlenecks with symptoms and recommendations."
         )
-        expected = "Structured PerformanceAgentOutput with top performance risks and findings."
+        expected = (
+            "Structured PerformanceAgentOutput with top performance risks and findings."
+        )
         context = self._serialize_context(
             scanner_output, self.config.token_budgets.performance_context
         )
@@ -353,7 +385,7 @@ class CrewBranchExecutor:
             process=Process.sequential,
             verbose=False,
         )
-        result = crew.kickoff()
+        result: Any = crew.kickoff()
         if getattr(result, "pydantic", None) is not None:
             pydantic_result = result.pydantic
             if isinstance(pydantic_result, output_model):
@@ -375,12 +407,16 @@ class CrewBranchExecutor:
 
     def _serialize_context(self, scanner_output: ScannerOutput, budget: int) -> str:
         scanner_payload = scanner_output.model_dump(mode="json")
-        context = orjson.dumps(scanner_payload, option=orjson.OPT_SORT_KEYS).decode("utf-8")
+        context = orjson.dumps(scanner_payload, option=orjson.OPT_SORT_KEYS).decode(
+            "utf-8"
+        )
         self._token_budgeter.ensure_within_budget(context, budget)
         return context
 
     @staticmethod
-    def _normalize_output_metadata(model: MODEL_T, scanner_output: ScannerOutput) -> MODEL_T:
+    def _normalize_output_metadata(
+        model: MODEL_T, scanner_output: ScannerOutput
+    ) -> MODEL_T:
         updates: dict[str, Any] = {
             "schema_version": scanner_output.schema_version,
             "run_id": scanner_output.run_id,
@@ -487,20 +523,20 @@ def synthesize_roadmap(
     )
     roadmap_items: list[RoadmapItem] = []
     for finding in sorted_findings[:10]:
-        priority = (
-            "P0"
-            if finding.severity in {Severity.CRITICAL, Severity.HIGH}
-            else "P1"
-            if finding.severity == Severity.MEDIUM
-            else "P2"
-        )
-        timeline = (
-            "immediate_1_2_days"
-            if priority == "P0"
-            else "short_term_1_2_weeks"
-            if priority == "P1"
-            else "medium_term_1_2_months"
-        )
+        priority: Priority
+        if finding.severity in {Severity.CRITICAL, Severity.HIGH}:
+            priority = Priority.P0
+        elif finding.severity == Severity.MEDIUM:
+            priority = Priority.P1
+        else:
+            priority = Priority.P2
+        timeline: TimelineBucket
+        if priority == Priority.P0:
+            timeline = "immediate_1_2_days"
+        elif priority == Priority.P1:
+            timeline = "short_term_1_2_weeks"
+        else:
+            timeline = "medium_term_1_2_months"
         roadmap_items.append(
             RoadmapItem(
                 priority=priority,
@@ -574,7 +610,15 @@ def _security_recommendation(evidence: EvidenceItem) -> str:
 
 def _contains_perf_signal(summary: str) -> bool:
     lowered = summary.lower()
-    keywords = ["n+1", "synchronous", "sync", "pagination", "cache", "payload", "latency"]
+    keywords = [
+        "n+1",
+        "synchronous",
+        "sync",
+        "pagination",
+        "cache",
+        "payload",
+        "latency",
+    ]
     return any(keyword in lowered for keyword in keywords)
 
 

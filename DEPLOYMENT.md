@@ -12,7 +12,7 @@ Use when operating a small team or internal service:
 
 - Host RepoClinic container
 - Mount persistent directories for artifacts and SQLite DB
-- Optionally run local Langfuse (`docker-compose.langfuse.yml`) on the same VM
+- Use Langfuse Cloud for observability exports
 
 Suitable for AWS EC2, GCP Compute Engine, or Azure Virtual Machines.
 
@@ -36,11 +36,11 @@ For this mode, persist artifacts to object storage and move state from SQLite to
 - Configure CPU/memory based on repository size profile.
 - Keep tool versions pinned and roll updates through controlled image releases.
 
-## 4) Langfuse in production
+## 4) Langfuse Cloud in production
 
-- `LANGFUSE_HOST` should target your deployed Langfuse endpoint.
+- `LANGFUSE_BASE_URL` should target your Langfuse Cloud endpoint (`https://cloud.langfuse.com` by default).
 - `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` should be provisioned per environment.
-- For self-hosted Langfuse, prefer managed Postgres/ClickHouse/Redis/Blob storage for durability.
+- Keep production keys scoped per environment and rotate through your secret manager policy.
 
 ## 5) Example release flow
 

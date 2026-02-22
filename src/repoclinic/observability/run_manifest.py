@@ -9,7 +9,6 @@ import subprocess
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
 
 import orjson
 from pydantic import Field
@@ -130,7 +129,9 @@ class RunManifestCollector:
             branch_failures=redact_mapping(dict(branch_failures)),
         )
 
-    def _resolve_repo_location(self, *, request: AnalyzeRequest, run_id: str) -> tuple[str, Path]:
+    def _resolve_repo_location(
+        self, *, request: AnalyzeRequest, run_id: str
+    ) -> tuple[str, Path]:
         if request.input.source_type == "local_path":
             assert request.input.local_path is not None
             path = Path(request.input.local_path).expanduser().resolve()

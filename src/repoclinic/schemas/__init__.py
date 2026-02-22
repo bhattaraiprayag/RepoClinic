@@ -17,7 +17,11 @@ from repoclinic.schemas.enums import (
 from repoclinic.schemas.flow_models import FlowState
 from repoclinic.schemas.input_models import AnalyzeRequest, RunMetadata
 from repoclinic.schemas.output_models import RoadmapItem, SummaryJson
-from repoclinic.schemas.scanner_models import DependencyFinding, EvidenceItem, ScannerOutput
+from repoclinic.schemas.scanner_models import (
+    DependencyFinding,
+    EvidenceItem,
+    ScannerOutput,
+)
 
 __all__ = [
     "AnalyzeRequest",

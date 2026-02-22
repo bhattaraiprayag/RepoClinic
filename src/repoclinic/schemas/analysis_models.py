@@ -5,7 +5,12 @@ from __future__ import annotations
 from pydantic import Field, model_validator
 
 from repoclinic.schemas.base import StrictSchemaModel, VersionedRunModel
-from repoclinic.schemas.enums import ArchitectureType, FindingCategory, FindingStatus, Severity
+from repoclinic.schemas.enums import (
+    ArchitectureType,
+    FindingCategory,
+    FindingStatus,
+    Severity,
+)
 
 
 class FindingEvidence(StrictSchemaModel):
@@ -59,7 +64,9 @@ class ArchitectureAgentOutput(VersionedRunModel):
     def validate_findings_category(self) -> "ArchitectureAgentOutput":
         for finding in self.findings:
             if finding.category != FindingCategory.ARCHITECTURE:
-                raise ValueError("architecture output must only contain architecture findings")
+                raise ValueError(
+                    "architecture output must only contain architecture findings"
+                )
         return self
 
 
@@ -103,5 +110,7 @@ class PerformanceAgentOutput(VersionedRunModel):
     def validate_findings_category(self) -> "PerformanceAgentOutput":
         for finding in self.findings:
             if finding.category != FindingCategory.PERFORMANCE:
-                raise ValueError("performance output must only contain performance findings")
+                raise ValueError(
+                    "performance output must only contain performance findings"
+                )
         return self

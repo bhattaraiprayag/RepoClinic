@@ -36,10 +36,14 @@ def apply_overrides(
 
     if cli_overrides:
         if cli_overrides.get("default_provider_profile"):
-            merged["default_provider_profile"] = cli_overrides["default_provider_profile"]
+            merged["default_provider_profile"] = cli_overrides[
+                "default_provider_profile"
+            ]
         if cli_overrides.get("max_file_size_bytes") is not None:
             merged.setdefault("scan_policy", {})
-            merged["scan_policy"]["max_file_size_bytes"] = cli_overrides["max_file_size_bytes"]
+            merged["scan_policy"]["max_file_size_bytes"] = cli_overrides[
+                "max_file_size_bytes"
+            ]
     return merged
 
 

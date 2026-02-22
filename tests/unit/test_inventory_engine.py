@@ -30,4 +30,8 @@ def test_inventory_tracks_encoding_and_size_skips(tmp_path: Path) -> None:
 
     assert result.stats.files_scanned >= 1
     assert result.stats.skipped_reasons.too_large >= 1
-    assert result.stats.skipped_reasons.binary + result.stats.skipped_reasons.encoding_error >= 1
+    assert (
+        result.stats.skipped_reasons.binary
+        + result.stats.skipped_reasons.encoding_error
+        >= 1
+    )

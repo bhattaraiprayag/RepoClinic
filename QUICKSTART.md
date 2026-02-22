@@ -5,7 +5,7 @@
 - Linux/macOS (or WSL2 on Windows)
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
-- Docker + Docker Compose (for container workflows and local Langfuse)
+- Docker (for container workflows)
 - Git
 
 ## 2) Initial setup (without Makefile)
@@ -31,6 +31,15 @@ cp .env.example .env
 ```
 
 ## 4) Run repository checks locally (without Makefile)
+
+CLI pattern is `uv run repoclinic <command> [options]`.
+`--path`, `--repo`, and `--config` are command-specific options (not global CLI options).
+
+### Validate configuration
+
+```bash
+uv run repoclinic validate-config --config config/settings.yaml
+```
 
 ### Check a local repository
 
@@ -135,59 +144,45 @@ make docker-analyze-local REPO_PATH=/absolute/path/to/repository OUTPUT_DIR=arti
 make docker-analyze-remote REPO_URL=https://github.com/owner/repository OUTPUT_DIR=artifacts/docker-remote
 ```
 
-## 8) Run local Langfuse for observability
+## 8) Configure Langfuse Cloud observability
 
 RepoClinic uses these environment variables:
 
 - `LANGFUSE_PUBLIC_KEY`
 - `LANGFUSE_SECRET_KEY`
-- `LANGFUSE_HOST` (for local setup use `http://localhost:3000`)
+- `LANGFUSE_BASE_URL` (default: `https://cloud.langfuse.com`)
 
-### Start Langfuse stack (without Makefile)
-
-```bash
-cp .env.langfuse.example .env.langfuse
-# Update all placeholder secrets before starting
-
-docker compose --env-file .env.langfuse -f docker-compose.langfuse.yml up -d
-```
-
-### Start Langfuse stack (with Makefile)
+### Configure credentials
 
 ```bash
-make langfuse-up
+cp .env.example .env
+# Set the following keys from your Langfuse Cloud project settings:
+# LANGFUSE_PUBLIC_KEY
+# LANGFUSE_SECRET_KEY
+# LANGFUSE_BASE_URL (keep https://cloud.langfuse.com unless using a regional/custom endpoint)
 ```
 
-### Where to get Langfuse public/secret keys
-
-Use either approach:
-
-1. **UI-based keys** (default Langfuse behavior): open Langfuse at `http://localhost:3000`, create organization/project, then read keys in **Project Settings -> API Keys**.
-2. **Headless initialization keys**: set `LANGFUSE_INIT_PROJECT_PUBLIC_KEY` and `LANGFUSE_INIT_PROJECT_SECRET_KEY` in `.env.langfuse`; these become the project keys on startup.
-
-After choosing one approach, copy the resulting values into RepoClinic `.env`:
-
-```env
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=http://localhost:3000
-```
-
-Then run any `analyze`/`resume` command and verify traces in Langfuse.
-
-### Stop Langfuse
+Validate that required Langfuse Cloud variables are present:
 
 ```bash
-make langfuse-down
-# or
-docker compose --env-file .env.langfuse -f docker-compose.langfuse.yml down
+make langfuse-cloud-check
 ```
 
-## 9) Useful utility commands
+Then run any `analyze`/`resume` command and verify traces in Langfuse Cloud.
+
+## 9) Quality checks and pre-commit
+
+```bash
+uv run pre-commit install
+make precommit
+```
+
+## 10) Useful utility commands
 
 ```bash
 make validate-config
 make healthcheck
 make test
 make check
+make precommit
 ```

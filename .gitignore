@@ -15,4 +15,4 @@ wheels/
 /artifacts/
 .sqlite/
 .env
-.env.langfuse
+.pre-commit-cache/

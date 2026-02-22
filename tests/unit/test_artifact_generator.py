@@ -53,7 +53,9 @@ def _scanner_output() -> ScannerOutput:
     )
 
 
-def _finding(category: FindingCategory, title: str, severity: Severity, fid: str) -> BaseFinding:
+def _finding(
+    category: FindingCategory, title: str, severity: Severity, fid: str
+) -> BaseFinding:
     return BaseFinding(
         id=fid,
         category=category,
@@ -273,7 +275,9 @@ def test_write_artifacts_creates_output_files(tmp_path: Path) -> None:
         performance_output=_performance_output(),
         roadmap_items=_roadmap_items(),
     )
-    generated = write_artifacts(output_dir=tmp_path, summary=summary, report_markdown=report)
+    generated = write_artifacts(
+        output_dir=tmp_path, summary=summary, report_markdown=report
+    )
     assert generated.summary_path.exists()
     assert generated.report_path.exists()
     assert generated.summary_path.read_text(encoding="utf-8").strip().startswith("{")

@@ -11,8 +11,9 @@ RepoClinic is a deterministic repository analysis CLI built on a stateful scanne
 - Parallel architecture, security, and performance analysis branches
 - Checkpointed flow execution with resume support
 - Structured output contracts using Pydantic models
-- Optional Langfuse observability integration for run/stage traces
+- Optional Langfuse Cloud observability integration for run/stage traces
 - Local and containerized execution paths
+- Built-in quality gates via pre-commit and GitHub Actions CI
 
 ## Documentation index
 
@@ -33,4 +34,4 @@ cp .env.example .env
 uv run repoclinic validate-config
 ```
 
-For runnable examples (local repo checks, GitHub checks, custom output directories, Docker runs, and Langfuse local setup), use [QUICKSTART.md](QUICKSTART.md).
+For runnable examples (local repo checks, GitHub checks, custom output directories, Docker runs, and Langfuse Cloud setup), use [QUICKSTART.md](QUICKSTART.md).

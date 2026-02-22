@@ -20,17 +20,23 @@
 - Run manifest persistence and tracing hooks integrated.
 - Retry/timeouts and redaction controls added.
 - Docker packaging and acceptance-test matrix completed.
+- Langfuse observability workflow migrated to Langfuse Cloud (`LANGFUSE_BASE_URL`).
+
+### v0 developer workflow hardening
+
+- Pre-commit checks integrated for formatter/lint enforcement.
+- GitHub Actions CI workflow added for pre-commit, formatting, lint, tests, and config validation.
+- Makefile quality/observability targets updated for cloud-first operations.
 
 ## In-progress priorities
 
-- Consolidate local observability workflow with self-hosted Langfuse defaults.
-- Expand operator ergonomics through Makefile-based execution shortcuts.
-- Improve documentation quality and separation of concerns.
+- Improve deterministic branch heuristics for lower false-positive rates.
+- Add optional remote persistence backends for multi-run operational history.
+- Extend acceptance fixtures with larger polyglot repositories.
 
 ## Next priorities
 
-1. Add CI workflows for automated lint/test/docker checks.
-2. Improve deterministic branch heuristics for lower false-positive rates.
-3. Add optional remote persistence backends for multi-run operational history.
-4. Extend acceptance fixtures with larger polyglot repositories.
-5. Introduce release automation and signed container publishing.
+1. Introduce release automation and signed container publishing.
+2. Add matrix CI coverage for multiple Python/runtime environments.
+3. Add observability dashboards and SLO alerts for long-running analyses.
+4. Expand Docker image hardening (SBOM + vulnerability gating).

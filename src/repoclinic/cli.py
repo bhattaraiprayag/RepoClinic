@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import typer
@@ -77,8 +77,12 @@ def analyze(
     local_path: Path | None = typer.Option(
         None, "--path", help="Local repository path."
     ),
-    branch: str | None = typer.Option(None, "--branch", help="Git branch to check out."),
-    commit: str | None = typer.Option(None, "--commit", help="Git commit SHA to check out."),
+    branch: str | None = typer.Option(
+        None, "--branch", help="Git branch to check out."
+    ),
+    commit: str | None = typer.Option(
+        None, "--commit", help="Git commit SHA to check out."
+    ),
     provider_profile: str | None = typer.Option(
         None, "--provider-profile", help="Provider profile name from config."
     ),
@@ -90,12 +94,16 @@ def analyze(
     output_dir: Path = typer.Option(
         Path("artifacts"), "--output-dir", help="Directory for report artifacts."
     ),
-    config: Path | None = typer.Option(None, "--config", help="Path to settings.yaml override."),
+    config: Path | None = typer.Option(
+        None, "--config", help="Path to settings.yaml override."
+    ),
     db_path: Path = typer.Option(
         Path(".sqlite/repoclinic.db"), "--db-path", help="SQLite path for flow state."
     ),
     workspace_root: Path = typer.Option(
-        Path(".scanner-workspace"), "--workspace-root", help="Workspace root for cloned repos."
+        Path(".scanner-workspace"),
+        "--workspace-root",
+        help="Workspace root for cloned repos.",
     ),
 ) -> None:
     """Run full scanner-first analysis and generate report artifacts."""
@@ -153,12 +161,16 @@ def resume(
     output_dir: Path = typer.Option(
         Path("artifacts"), "--output-dir", help="Directory for report artifacts."
     ),
-    config: Path | None = typer.Option(None, "--config", help="Path to settings.yaml override."),
+    config: Path | None = typer.Option(
+        None, "--config", help="Path to settings.yaml override."
+    ),
     db_path: Path = typer.Option(
         Path(".sqlite/repoclinic.db"), "--db-path", help="SQLite path for flow state."
     ),
     workspace_root: Path = typer.Option(
-        Path(".scanner-workspace"), "--workspace-root", help="Workspace root for cloned repos."
+        Path(".scanner-workspace"),
+        "--workspace-root",
+        help="Workspace root for cloned repos.",
     ),
 ) -> None:
     """Resume a checkpointed analysis run and regenerate artifacts."""
@@ -195,7 +207,9 @@ def resume(
 
 @app.command("healthcheck")
 def healthcheck(
-    config: Path | None = typer.Option(None, "--config", help="Path to settings.yaml override."),
+    config: Path | None = typer.Option(
+        None, "--config", help="Path to settings.yaml override."
+    ),
     db_path: Path = typer.Option(
         Path(".sqlite/repoclinic.db"), "--db-path", help="SQLite path for flow state."
     ),
@@ -240,7 +254,9 @@ def _build_request(
     commit: str | None,
 ) -> AnalyzeRequest:
     profile = runner.config.provider_profiles[profile_name]
-    source_type = "github_url" if repo else "local_path"
+    source_type: Literal["github_url", "local_path"] = (
+        "github_url" if repo else "local_path"
+    )
     analyze_input = AnalyzeInput(
         source_type=source_type,
         github_url=repo,

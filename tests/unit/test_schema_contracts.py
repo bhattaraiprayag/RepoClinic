@@ -7,7 +7,12 @@ from pydantic import ValidationError
 
 from repoclinic.constants import SCHEMA_VERSION
 from repoclinic.schemas.analysis_models import BaseFinding
-from repoclinic.schemas.enums import FindingCategory, FindingStatus, ProviderType, Severity
+from repoclinic.schemas.enums import (
+    FindingCategory,
+    FindingStatus,
+    ProviderType,
+    Severity,
+)
 from repoclinic.schemas.input_models import AnalyzeRequest, ProviderConfig
 from repoclinic.schemas.output_models import SummaryJson
 
