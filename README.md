@@ -19,7 +19,6 @@ RepoClinic is a deterministic repository analysis CLI built on a stateful scanne
 
 - [QUICKSTART.md](QUICKSTART.md) - installation and day-one usage (local, Docker, and Makefile workflows)
 - [ARCHITECTURE.md](ARCHITECTURE.md) - component design, flow execution model, and data schema
-- [DEPLOYMENT.md](DEPLOYMENT.md) - production deployment patterns and operational guidance
 - [ROADMAP.md](ROADMAP.md) - completed milestones and forward-looking priorities
 - [CONTRIBUTING.md](CONTRIBUTING.md) - contribution and review workflow
 - [CHANGELOG.md](CHANGELOG.md) - release history
