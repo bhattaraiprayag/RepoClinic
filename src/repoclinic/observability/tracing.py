@@ -47,7 +47,7 @@ class LangfuseTracer:
         self._client: Any | None = None
         public_key = env.get("LANGFUSE_PUBLIC_KEY")
         secret_key = env.get("LANGFUSE_SECRET_KEY")
-        host = env.get("LANGFUSE_BASE_URL") or env.get("LANGFUSE_HOST")
+        host = env.get("LANGFUSE_HOST") or env.get("LANGFUSE_BASE_URL")
         if not public_key or not secret_key:
             return
 
@@ -61,7 +61,7 @@ class LangfuseTracer:
             "secret_key": secret_key,
         }
         if host:
-            kwargs["host"] = host
+            kwargs["host"] = host.rstrip("/")
         self._client = Langfuse(**kwargs)
         self._trace_context_by_run_id: dict[str, dict[str, str]] = {}
 

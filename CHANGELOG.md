@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - LM Studio provider integration now enforces env-driven auth token usage, normalizes OpenAI-compatible base URLs, and supports env overrides for base URL/model.
 - LM Studio config/model normalization now standardizes `lm_studio/` model prefixes, accepts `LM_STUDIO_API_BASE`, and supports `LM_STUDIO_API_KEY` as a compatibility alias.
+- Runtime startup now auto-loads `.env` values (without overriding exported shell vars), so LM Studio and Langfuse credentials are picked up during CLI/flow execution.
+- Langfuse host resolution now prefers `LANGFUSE_HOST` over `LANGFUSE_BASE_URL`, aligning local self-hosted deployments as the primary observability target.
 - `.env.example` now includes LM Studio runtime variables and default provider profile guidance.
 - Runtime dependencies now include `litellm` to support CrewAI LLM instantiation for provider-backed branch execution.
 - Flow runner now exposes artifact materialization from persisted ARC-FL2 state to support post-flow report generation and resume workflows.

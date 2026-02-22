@@ -13,6 +13,7 @@ dependencies = [
     "litellm>=1.75.3",
     "orjson>=3.11.7",
     "pathspec>=1.0.4",
+    "python-dotenv>=1.1.1",
     "pydantic>=2.11.10",
     "pyyaml>=6.0.3",
     "rich>=14.3.3",

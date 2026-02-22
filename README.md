@@ -11,6 +11,7 @@ RepoClinic is a deterministic, stateful ARC-FL2 CrewAI flow for repository analy
 2. Copy environment template:
    - `cp .env.example .env`
 3. Populate `.env` with provider credentials (OpenAI and/or LM Studio, optional Langfuse).
+4. RepoClinic auto-loads `.env` from the current directory (or parent directories) at startup without overriding already-exported shell vars.
 
 ## Run
 
@@ -28,6 +29,18 @@ Resume a run:
 
 Healthcheck:
 - `python -m repoclinic healthcheck`
+
+## Local Langfuse observability
+
+RepoClinic uses the Langfuse Python SDK directly and reads:
+- `LANGFUSE_PUBLIC_KEY`
+- `LANGFUSE_SECRET_KEY`
+- `LANGFUSE_HOST` (preferred) or `LANGFUSE_BASE_URL`
+
+For local self-hosted Langfuse, set:
+- `LANGFUSE_HOST=http://localhost:3000`
+
+Then run `python -m repoclinic analyze ...`; flow-stage traces are sent to your local Langfuse project.
 
 Docker build/run:
 - `docker build -t repoclinic:0.1.0 .`

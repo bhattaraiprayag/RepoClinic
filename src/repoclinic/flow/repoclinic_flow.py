@@ -35,6 +35,7 @@ from repoclinic.observability import (
     create_tracer,
 )
 from repoclinic.resilience import RetryExecutor, RetryPolicy
+from repoclinic.runtime_env import load_runtime_env
 from repoclinic.security.redaction import redact_mapping, redact_text
 from repoclinic.schemas.analysis_models import (
     ArchitectureAgentOutput,
@@ -391,7 +392,11 @@ class RepoClinicFlowRunner:
         workspace_root: Path | None = None,
         env: dict[str, str] | None = None,
     ) -> None:
-        self.env = dict(os.environ) if env is None else env
+        if env is None:
+            load_runtime_env()
+            self.env = dict(os.environ)
+        else:
+            self.env = env
         self.config = load_app_config(config_path, env=self.env)
         self.db_path = db_path or Path(".sqlite/repoclinic.db")
         self.workspace_root = workspace_root or Path(".scanner-workspace")
