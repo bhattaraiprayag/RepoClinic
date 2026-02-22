@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from types import SimpleNamespace
 
+from _pytest.monkeypatch import MonkeyPatch
+
 import repoclinic.observability.tracing as tracing_module
 from repoclinic.observability.tracing import NoOpTracer, create_tracer
 
@@ -16,11 +18,11 @@ def test_create_tracer_returns_noop_without_langfuse_keys() -> None:
 
 
 class _FakeLangfuse:
-    def __init__(self, **kwargs) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, **kwargs: object) -> None:
         self.kwargs = kwargs
 
 
-def test_langfuse_tracer_prefers_langfuse_host(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_langfuse_tracer_prefers_langfuse_host(monkeypatch: MonkeyPatch) -> None:
     """LANGFUSE_HOST should take precedence when both host vars are set."""
     monkeypatch.setitem(sys.modules, "langfuse", SimpleNamespace(Langfuse=_FakeLangfuse))
     tracer = tracing_module.LangfuseTracer(
@@ -31,5 +33,6 @@ def test_langfuse_tracer_prefers_langfuse_host(monkeypatch) -> None:  # type: ig
             "LANGFUSE_BASE_URL": "https://cloud.langfuse.com",
         }
     )
-    assert tracer._client is not None  # type: ignore[attr-defined]
-    assert tracer._client.kwargs["host"] == "http://localhost:3000"  # type: ignore[attr-defined]
+    client = tracer._client
+    assert isinstance(client, _FakeLangfuse)
+    assert client.kwargs["host"] == "http://localhost:3000"

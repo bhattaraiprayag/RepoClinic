@@ -1,70 +1,36 @@
-## RepoClinic
+# RepoClinic
 
-RepoClinic is a deterministic, stateful ARC-FL2 CrewAI flow for repository analysis that outputs:
-- `report.md` (human-readable engineering report)
-- `summary.json` (schema-validated machine output)
+RepoClinic is a deterministic repository analysis CLI built on a stateful ARC-FL2 flow (scanner-first, fan-out branch analysis, fan-in roadmap synthesis). It analyzes local or GitHub repositories and produces two artifacts:
 
-## Setup
+- `report.md` for human-readable engineering review
+- `summary.json` for schema-validated machine consumption
 
-1. Install dependencies with `uv`:
-   - `uv sync`
-2. Copy environment template:
-   - `cp .env.example .env`
-3. Populate `.env` with provider credentials (OpenAI and/or LM Studio, optional Langfuse).
-4. RepoClinic auto-loads `.env` from the current directory (or parent directories) at startup without overriding already-exported shell vars.
+## Core capabilities
 
-## Run
+- Deterministic scanner pipeline with bounded repository traversal and evidence normalization
+- Parallel architecture, security, and performance analysis branches
+- Checkpointed flow execution with resume support
+- Structured output contracts using Pydantic models
+- Optional Langfuse observability integration for run/stage traces
+- Local and containerized execution paths
 
-Validate config:
-- `python -m repoclinic validate-config`
+## Documentation index
 
-Analyze a local repository:
-- `python -m repoclinic analyze --path /absolute/path/to/repo --output-dir artifacts`
+- [QUICKSTART.md](QUICKSTART.md) - installation and day-one usage (local, Docker, and Makefile workflows)
+- [ARCHITECTURE.md](ARCHITECTURE.md) - component design, flow execution model, and data schema
+- [DEPLOYMENT.md](DEPLOYMENT.md) - production deployment patterns and operational guidance
+- [ROADMAP.md](ROADMAP.md) - completed milestones and forward-looking priorities
+- [CONTRIBUTING.md](CONTRIBUTING.md) - contribution and review workflow
+- [CHANGELOG.md](CHANGELOG.md) - release history
+- [LICENSE.md](LICENSE.md) - license terms
 
-Analyze a GitHub repository:
-- `python -m repoclinic analyze --repo https://github.com/user/repo --output-dir artifacts`
+## Minimal start
 
-Resume a run:
-- `python -m repoclinic resume --run-id <run_id> --output-dir artifacts`
+```bash
+uv venv
+uv sync
+cp .env.example .env
+uv run repoclinic validate-config
+```
 
-Healthcheck:
-- `python -m repoclinic healthcheck`
-
-## Local Langfuse observability
-
-RepoClinic uses the Langfuse Python SDK directly and reads:
-- `LANGFUSE_PUBLIC_KEY`
-- `LANGFUSE_SECRET_KEY`
-- `LANGFUSE_HOST` (preferred) or `LANGFUSE_BASE_URL`
-
-For local self-hosted Langfuse, set:
-- `LANGFUSE_HOST=http://localhost:3000`
-
-Then run `python -m repoclinic analyze ...`; flow-stage traces are sent to your local Langfuse project.
-
-Docker build/run:
-- `docker build -t repoclinic:0.1.0 .`
-- `docker run --rm -v /absolute/repo:/target repoclinic:0.1.0 analyze --path /target --output-dir /target/.repoclinic-artifacts --branch-executor heuristic`
-
-## Architecture rationale
-
-The implementation follows ARC-FL2 from `planner-docs/5-IMPLEMENTATION-PLAN.md`:
-1. Start + validation
-2. Deterministic scanner stage
-3. Fan-out branches (architecture/security/performance)
-4. Fan-in roadmap trigger
-5. Artifact materialization
-
-Flow state is checkpointed in SQLite, transitions are logged, retries/backoff/jitter are applied at scanner/branch stages, and run manifests capture reproducibility metadata.
-
-## Known limitations
-
-- CrewAI branch execution requires provider credentials; use `--branch-executor heuristic` for deterministic offline operation.
-- Security/performance depth depends on deterministic scanner evidence and enabled external tools.
-- Dockerfile pins tool versions and expects compatible package repositories for those exact pins.
-
-## Scale path
-
-- Add distributed job partitioning only when throughput data justifies moving beyond single-node ARC-FL2.
-- Expand language-specific evidence extraction and suppression registries to reduce false positives.
-- Add richer observability correlation (trace IDs in artifacts, latency SLO dashboards) and CI acceptance gates.
+For runnable examples (local repo checks, GitHub checks, custom output directories, Docker runs, and Langfuse local setup), use [QUICKSTART.md](QUICKSTART.md).

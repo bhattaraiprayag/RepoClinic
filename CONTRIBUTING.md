@@ -1,14 +1,23 @@
 # Contributing
 
-## Workflow
+## Contribution model
 
-1. Follow strict TDD loops for every atomic task:
-   - write a failing test
-   - implement minimal code
-   - make tests pass
-   - refactor safely when needed
-2. Keep changes scoped to one atomic task per commit.
-3. Update `CHANGELOG.md` before each commit.
+Contributions are welcome through pull requests scoped to a single objective (feature, fix, or refactor).
+
+## Development setup
+
+```bash
+uv venv
+source .venv/bin/activate
+uv sync
+```
+
+## Engineering standards
+
+- Follow strict TDD loops: failing test -> minimal implementation -> green tests -> refactor.
+- Keep changes atomic and cohesive.
+- Maintain type safety and deterministic behavior.
+- Update `CHANGELOG.md` for user-visible behavior changes.
 
 ## Commit convention
 
@@ -16,9 +25,31 @@ Use:
 
 `<type>(<scope>): <imperative summary>`
 
-Allowed types: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`.
+Supported `type` values:
 
-## Local development
+- `feat`
+- `fix`
+- `refactor`
+- `test`
+- `chore`
+- `docs`
 
-- Use `uv` for dependency and environment management.
-- Run tests with `uv run pytest`.
+## Validation before PR
+
+```bash
+make check
+make validate-config
+```
+
+If Docker paths were modified, also run:
+
+```bash
+make docker-build
+```
+
+## Pull request checklist
+
+- [ ] Tests added/updated for the change
+- [ ] Existing tests pass
+- [ ] Changelog updated
+- [ ] Documentation updated where required

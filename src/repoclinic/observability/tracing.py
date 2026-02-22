@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from typing import Any, Mapping, Protocol
 
 from repoclinic.security.redaction import redact_mapping
+
+LOGGER = logging.getLogger(__name__)
 
 
 class TracerProtocol(Protocol):
@@ -45,6 +48,7 @@ class LangfuseTracer:
 
     def __init__(self, env: Mapping[str, str]) -> None:
         self._client: Any | None = None
+        self._trace_context_by_run_id: dict[str, dict[str, str]] = {}
         public_key = env.get("LANGFUSE_PUBLIC_KEY")
         secret_key = env.get("LANGFUSE_SECRET_KEY")
         host = env.get("LANGFUSE_HOST") or env.get("LANGFUSE_BASE_URL")
@@ -53,7 +57,8 @@ class LangfuseTracer:
 
         try:
             from langfuse import Langfuse
-        except Exception:
+        except ImportError:
+            LOGGER.debug("langfuse package not installed; tracing disabled.")
             return
 
         kwargs: dict[str, Any] = {
@@ -62,8 +67,16 @@ class LangfuseTracer:
         }
         if host:
             kwargs["host"] = host.rstrip("/")
-        self._client = Langfuse(**kwargs)
-        self._trace_context_by_run_id: dict[str, dict[str, str]] = {}
+        try:
+            self._client = Langfuse(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Failed to initialize Langfuse client: %s", exc)
+            self._client = None
+
+    @property
+    def enabled(self) -> bool:
+        """Return whether Langfuse tracing is active."""
+        return self._client is not None
 
     def start_run(self, *, run_id: str, metadata: dict[str, Any]) -> None:
         if self._client is None:
@@ -78,8 +91,8 @@ class LangfuseTracer:
                 metadata=redact_mapping(metadata),
             ):
                 pass
-        except Exception:
-            return
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.debug("Langfuse start_run failed: %s", exc)
 
     def record_stage(self, *, run_id: str, stage: str, metadata: dict[str, Any]) -> None:
         if self._client is None:
@@ -93,8 +106,8 @@ class LangfuseTracer:
                 metadata=redact_mapping(metadata),
             ):
                 pass
-        except Exception:
-            return
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.debug("Langfuse record_stage failed: %s", exc)
 
     def finish_run(self, *, run_id: str, metadata: dict[str, Any]) -> None:
         if self._client is None:
@@ -108,25 +121,26 @@ class LangfuseTracer:
                 metadata=redact_mapping(metadata),
             ):
                 pass
-        except Exception:
-            return
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.debug("Langfuse finish_run failed: %s", exc)
 
     def flush(self) -> None:
         if self._client is None:
             return
         try:
             self._client.flush()
-        except Exception:
-            return
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.debug("Langfuse flush failed: %s", exc)
 
 
 def create_tracer(env: Mapping[str, str]) -> TracerProtocol:
     """Create Langfuse tracer if configured, else no-op tracer."""
     tracer = LangfuseTracer(env)
-    if tracer._client is None:  # type: ignore[attr-defined]
+    if not tracer.enabled:
         return NoOpTracer()
     return tracer
 
 
 def _trace_id(run_id: str) -> str:
+    """Derive deterministic 32-char trace IDs from run IDs."""
     return hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:32]
