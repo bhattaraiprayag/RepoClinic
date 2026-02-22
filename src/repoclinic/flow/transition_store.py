@@ -1,4 +1,4 @@
-"""Flow transition logging for ARC-FL2 state tracking."""
+"""Flow transition logging for state tracking."""
 
 from __future__ import annotations
 

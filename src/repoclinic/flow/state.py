@@ -1,4 +1,4 @@
-"""Flow state model for ARC-FL2 orchestration."""
+"""Flow state model for scanner-first orchestration."""
 
 from __future__ import annotations
 

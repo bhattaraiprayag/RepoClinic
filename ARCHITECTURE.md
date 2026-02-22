@@ -2,11 +2,11 @@
 
 ## 1) System overview
 
-RepoClinic implements ARC-FL2 as a deterministic, stateful pipeline:
+RepoClinic implements a scanner-first stateful flow as a deterministic pipeline:
 
 ```mermaid
 flowchart TD
-    CLI["Typer CLI\n(analyze/resume/validate-config)"] --> FlowRunner[RepoClinicFlowRunner]
+    CLI["Typer CLI<br>(analyze/resume/validate-config)"] --> FlowRunner[RepoClinicFlowRunner]
     FlowRunner --> Start[Validate request + state]
     Start --> Scanner[Deterministic scanner stage]
     Scanner --> Arch[Architecture branch]
@@ -17,10 +17,10 @@ flowchart TD
     Perf --> Join
     Join --> Artifacts[summary.json + report.md]
 
-    FlowRunner --> Manifest["Run manifest store\nSQLite"]
-    Start --> TransitionLog["Flow transition log\nSQLite"]
-    Scanner --> ScannerStore["Scanner persistence\nSQLite"]
-    FlowRunner --> Tracing["Langfuse tracer\noptional"]
+    FlowRunner --> Manifest["Run manifest store<br>SQLite"]
+    Start --> TransitionLog["Flow transition log<br>SQLite"]
+    Scanner --> ScannerStore["Scanner persistence<br>SQLite"]
+    FlowRunner --> Tracing["Langfuse tracer<br>optional"]
 ```
 
 ## 2) Component boundaries
@@ -28,7 +28,7 @@ flowchart TD
 | Component | Responsibility |
 |---|---|
 | `repoclinic.cli` | Operator-facing commands and input validation |
-| `repoclinic.flow` | ARC-FL2 orchestration, checkpointing, resume logic |
+| `repoclinic.flow` | Flow orchestration, checkpointing, resume logic |
 | `repoclinic.scanner` | Deterministic source resolution, inventory, heuristics, evidence normalization |
 | `repoclinic.agents` | Branch analyzers and roadmap synthesis |
 | `repoclinic.artifacts` | Deterministic `summary.json` and `report.md` generation |

@@ -98,7 +98,7 @@ def analyze(
         Path(".scanner-workspace"), "--workspace-root", help="Workspace root for cloned repos."
     ),
 ) -> None:
-    """Run full ARC-FL2 analysis and generate report artifacts."""
+    """Run full scanner-first analysis and generate report artifacts."""
     try:
         _ensure_single_input(repo=repo, local_path=local_path)
         runner = RepoClinicFlowRunner(
@@ -121,7 +121,7 @@ def analyze(
             transient=True,
             console=console,
         ) as progress:
-            progress.add_task(description="Running ARC-FL2 flow", total=None)
+            progress.add_task(description="Running analysis flow", total=None)
             state = runner.kickoff(
                 request=request,
                 provider_profile=profile_name,
@@ -161,7 +161,7 @@ def resume(
         Path(".scanner-workspace"), "--workspace-root", help="Workspace root for cloned repos."
     ),
 ) -> None:
-    """Resume a checkpointed ARC-FL2 run and regenerate artifacts."""
+    """Resume a checkpointed analysis run and regenerate artifacts."""
     try:
         runner = RepoClinicFlowRunner(
             config_path=config,
@@ -175,7 +175,7 @@ def resume(
             transient=True,
             console=console,
         ) as progress:
-            progress.add_task(description="Resuming ARC-FL2 flow", total=None)
+            progress.add_task(description="Resuming analysis flow", total=None)
             state = runner.resume(
                 run_id=run_id,
                 provider_profile=profile_name,

@@ -1,4 +1,4 @@
-"""Phase 4 integration tests for ARC-FL2 flow orchestration."""
+"""Phase 4 integration tests for scanner-first flow orchestration."""
 
 from __future__ import annotations
 

@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Canonical Pydantic contracts across input, scanner, branch, roadmap, summary, and flow-state payloads.
 - Central YAML configuration with provider profiles, override precedence, and token budget utilities.
 - Deterministic scanner pipeline with source resolution, inventory, ignore policy, heuristics, and persistence.
-- ARC-FL2 flow orchestration with scanner-first ordering, checkpointed fan-out/fan-in, and resume guards.
+- Stateful scanner-first flow orchestration with checkpointed fan-out/fan-in and resume guards.
 - Branch analysis execution layer (architecture/security/performance) and roadmap synthesis.
 - Artifact generation for deterministic `summary.json` and fixed-section `report.md` outputs.
 - CLI command surface for analyze, resume, validate-config, and healthcheck workflows.

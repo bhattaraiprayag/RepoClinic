@@ -1,4 +1,4 @@
-"""ARC-FL2 flow-state schema contracts."""
+"""Flow-state schema contracts."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from repoclinic.schemas.enums import FlowNodeState
 
 
 class FlowState(StrictSchemaModel):
-    """Flow checkpoint state fields for ARC-FL2."""
+    """Flow checkpoint state fields for the scanner-first pipeline."""
 
     flow_id: str = Field(min_length=1)
     node_id: str = Field(min_length=1)

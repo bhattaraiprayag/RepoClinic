@@ -1,4 +1,4 @@
-"""ARC-FL2 stateful flow orchestration."""
+"""Stateful scanner-first flow orchestration."""
 
 from __future__ import annotations
 

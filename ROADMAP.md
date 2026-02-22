@@ -10,7 +10,7 @@
 
 ### v0 orchestration and analysis (Phases 4-7)
 
-- Stateful ARC-FL2 flow with fan-out/fan-in and resume support delivered.
+- Stateful scanner-first flow with fan-out/fan-in and resume support delivered.
 - Architecture, security, and performance branch analysis integrated.
 - Roadmap synthesis and artifact generation stabilized.
 - CLI operator workflows completed (`analyze`, `resume`, `validate-config`, `healthcheck`).

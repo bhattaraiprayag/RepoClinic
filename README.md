@@ -1,6 +1,6 @@
 # RepoClinic
 
-RepoClinic is a deterministic repository analysis CLI built on a stateful ARC-FL2 flow (scanner-first, fan-out branch analysis, fan-in roadmap synthesis). It analyzes local or GitHub repositories and produces two artifacts:
+RepoClinic is a deterministic repository analysis CLI built on a stateful scanner-first flow (fan-out branch analysis, fan-in roadmap synthesis). It analyzes local or GitHub repositories and produces two artifacts:
 
 - `report.md` for human-readable engineering review
 - `summary.json` for schema-validated machine consumption
