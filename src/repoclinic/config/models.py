@@ -14,6 +14,7 @@ class RetryConfig(StrictSchemaModel):
 
     max_attempts: int = Field(default=3, ge=1, le=10)
     backoff_seconds: float = Field(default=1.0, ge=0.0)
+    jitter_seconds: float = Field(default=0.2, ge=0.0, le=5.0)
 
 
 class ProviderCapabilities(StrictSchemaModel):

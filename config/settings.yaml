@@ -29,6 +29,7 @@ provider_profiles:
 retries:
   max_attempts: 3
   backoff_seconds: 1.0
+  jitter_seconds: 0.2
 timeouts:
   scanner_seconds: 900
   agent_seconds: 600

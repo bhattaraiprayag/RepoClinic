@@ -22,9 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Phase 6 artifact generation layer with validated `summary.json` assembly, deterministic risk/roadmap ordering, fixed-section `report.md` rendering, and output writers.
 - Phase 7 CLI workflow with `analyze`, `resume`, and `validate-config` commands, rich status panels, provider profile selection, output directory controls, and hard-failure exit behavior.
 - Unit/integration test coverage for artifact schema/report contracts and CLI workflows (argument validation, resume path, config validation, artifact emission).
+- Phase 8 observability and resilience controls: retry/backoff/jitter execution helper, run manifest capture/persistence, Langfuse tracer integration hooks, and sensitive log redaction utilities.
+- Phase 9 packaging assets: Dockerfile with pinned toolchain versions and runtime healthcheck, plus acceptance matrix e2e tests (small/multi-language, large-file handling, partial-failure, deterministic rerun).
 
 ### Changed
 - LM Studio provider integration now enforces env-driven auth token usage, normalizes OpenAI-compatible base URLs, and supports env overrides for base URL/model.
 - `.env.example` now includes LM Studio runtime variables and default provider profile guidance.
 - Runtime dependencies now include `litellm` to support CrewAI LLM instantiation for provider-backed branch execution.
 - Flow runner now exposes artifact materialization from persisted ARC-FL2 state to support post-flow report generation and resume workflows.
+- CLI now supports branch executor mode selection (`crewai` or `heuristic`) and redacts sensitive error values in output paths.
+- Flow orchestration now applies retry policies/timeouts at scanner and branch stages, redacts failure reasons, and persists per-run metadata manifests.

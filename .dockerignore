@@ -1,0 +1,13 @@
+.git
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.sqlite
+artifacts
+.scanner-workspace
+tests
+planner-docs
+ref-docs

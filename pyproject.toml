@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "crewai>=1.9.3",
+    "langfuse>=3.14.4",
     "litellm>=1.75.3",
     "orjson>=3.11.7",
     "pathspec>=1.0.4",

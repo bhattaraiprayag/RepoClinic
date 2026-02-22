@@ -34,6 +34,7 @@ class RepoClinicFlowState(FlowState):
         }
     )
     branch_failures: dict[str, str] = Field(default_factory=dict)
+    run_manifest: dict[str, Any] | None = None
     scanner_output: dict[str, Any] | None = None
     architecture_output: dict[str, Any] | None = None
     security_output: dict[str, Any] | None = None

@@ -12,6 +12,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from repoclinic.agents import HeuristicBranchExecutor
 from repoclinic.config import load_app_config
 from repoclinic.constants import PACKAGE_VERSION
 from repoclinic.flow import RepoClinicFlowRunner
@@ -24,6 +25,7 @@ from repoclinic.schemas.input_models import (
     TimeoutConfig,
 )
 from repoclinic.schemas.output_models import AnalysisStatus
+from repoclinic.security.redaction import redact_text
 
 app = typer.Typer(
     add_completion=False,
@@ -80,6 +82,11 @@ def analyze(
     provider_profile: str | None = typer.Option(
         None, "--provider-profile", help="Provider profile name from config."
     ),
+    branch_executor: str = typer.Option(
+        "crewai",
+        "--branch-executor",
+        help="Branch executor mode: crewai or heuristic.",
+    ),
     output_dir: Path = typer.Option(
         Path("artifacts"), "--output-dir", help="Directory for report artifacts."
     ),
@@ -115,7 +122,11 @@ def analyze(
             console=console,
         ) as progress:
             progress.add_task(description="Running ARC-FL2 flow", total=None)
-            state = runner.kickoff(request=request, provider_profile=profile_name)
+            state = runner.kickoff(
+                request=request,
+                provider_profile=profile_name,
+                branch_executor=_resolve_branch_executor(branch_executor),
+            )
 
         artifacts = runner.materialize_artifacts(state=state, output_dir=output_dir)
         _render_status_panel(artifacts.summary.analysis_status)
@@ -124,7 +135,7 @@ def analyze(
     except typer.Exit:
         raise
     except Exception as exc:  # noqa: BLE001
-        console.print(f"[red]Analysis failed:[/red] {exc}")
+        console.print(f"[red]Analysis failed:[/red] {redact_text(str(exc))}")
         raise typer.Exit(code=1) from exc
 
 
@@ -133,6 +144,11 @@ def resume(
     run_id: str = typer.Option(..., "--run-id", help="Run ID to resume."),
     provider_profile: str | None = typer.Option(
         None, "--provider-profile", help="Provider profile name from config."
+    ),
+    branch_executor: str = typer.Option(
+        "crewai",
+        "--branch-executor",
+        help="Branch executor mode: crewai or heuristic.",
     ),
     output_dir: Path = typer.Option(
         Path("artifacts"), "--output-dir", help="Directory for report artifacts."
@@ -160,7 +176,11 @@ def resume(
             console=console,
         ) as progress:
             progress.add_task(description="Resuming ARC-FL2 flow", total=None)
-            state = runner.resume(run_id=run_id, provider_profile=profile_name)
+            state = runner.resume(
+                run_id=run_id,
+                provider_profile=profile_name,
+                branch_executor=_resolve_branch_executor(branch_executor),
+            )
 
         artifacts = runner.materialize_artifacts(state=state, output_dir=output_dir)
         _render_status_panel(artifacts.summary.analysis_status)
@@ -169,7 +189,29 @@ def resume(
     except typer.Exit:
         raise
     except Exception as exc:  # noqa: BLE001
-        console.print(f"[red]Resume failed:[/red] {exc}")
+        console.print(f"[red]Resume failed:[/red] {redact_text(str(exc))}")
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("healthcheck")
+def healthcheck(
+    config: Path | None = typer.Option(None, "--config", help="Path to settings.yaml override."),
+    db_path: Path = typer.Option(
+        Path(".sqlite/repoclinic.db"), "--db-path", help="SQLite path for flow state."
+    ),
+    quiet: bool = typer.Option(False, "--quiet", help="Suppress success output."),
+) -> None:
+    """Validate runtime readiness for deployment health probes."""
+    try:
+        cfg = load_app_config(config)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        db_path.touch(exist_ok=True)
+        if not quiet:
+            console.print(
+                f"[green]OK[/green] provider={cfg.default_provider_profile} db={db_path}"
+            )
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]Healthcheck failed:[/red] {redact_text(str(exc))}")
         raise typer.Exit(code=1) from exc
 
 
@@ -254,3 +296,12 @@ def _render_artifact_paths(summary_path: Path, report_path: Path) -> None:
 def _raise_on_hard_failure(status: AnalysisStatus) -> None:
     if status.scanner == "failed" or status.roadmap == "failed":
         raise typer.Exit(code=1)
+
+
+def _resolve_branch_executor(mode: str):  # noqa: ANN201
+    normalized = mode.strip().lower()
+    if normalized == "crewai":
+        return None
+    if normalized == "heuristic":
+        return HeuristicBranchExecutor()
+    raise typer.BadParameter("branch-executor must be either 'crewai' or 'heuristic'.")

@@ -10,6 +10,8 @@ from repoclinic.agents.executor import BranchExecutor, HeuristicBranchExecutor
 from repoclinic.config.models import AppConfig
 from repoclinic.flow.repoclinic_flow import RepoClinicFlow
 from repoclinic.flow.transition_store import FlowTransitionStore
+from repoclinic.observability.tracing import NoOpTracer
+from repoclinic.resilience.retry import RetryExecutor, RetryPolicy
 from repoclinic.schemas.analysis_models import (
     ArchitectureAgentOutput,
     PerformanceAgentOutput,
@@ -85,6 +87,10 @@ def _build_config() -> AppConfig:
     )
 
 
+def _retry_executor() -> RetryExecutor:
+    return RetryExecutor(RetryPolicy(max_attempts=1, backoff_seconds=0.0, jitter_seconds=0.0))
+
+
 def _scanner_output(run_id: str) -> ScannerOutput:
     return ScannerOutput(
         schema_version="1.0.0",
@@ -156,6 +162,8 @@ def test_flow_fan_out_fan_in_and_transition_log(tmp_path: Path) -> None:
         scanner_pipeline=scanner_pipeline,
         transition_store=transition_store,
         branch_executor=branch_executor,
+        retry_executor=_retry_executor(),
+        tracer=NoOpTracer(),
         persistence=SQLiteFlowPersistence(db_path=str(db_path)),
     )
     request = _request(run_id)
@@ -208,6 +216,8 @@ def test_flow_partial_failure_still_reaches_roadmap(tmp_path: Path) -> None:
         scanner_pipeline=_FakeScannerPipeline(_scanner_output(run_id)),
         transition_store=FlowTransitionStore(db_path),
         branch_executor=_FakeBranchExecutor(fail_security=True),
+        retry_executor=_retry_executor(),
+        tracer=NoOpTracer(),
         persistence=SQLiteFlowPersistence(db_path=str(db_path)),
     )
     request = _request(run_id)
@@ -241,6 +251,8 @@ def test_flow_resume_uses_idempotency_guards(tmp_path: Path) -> None:
         scanner_pipeline=scanner_pipeline,
         transition_store=FlowTransitionStore(db_path),
         branch_executor=branch_executor,
+        retry_executor=_retry_executor(),
+        tracer=NoOpTracer(),
         persistence=SQLiteFlowPersistence(db_path=str(db_path)),
     )
     first_flow.kickoff(
@@ -258,6 +270,8 @@ def test_flow_resume_uses_idempotency_guards(tmp_path: Path) -> None:
         scanner_pipeline=scanner_pipeline,
         transition_store=FlowTransitionStore(db_path),
         branch_executor=branch_executor,
+        retry_executor=_retry_executor(),
+        tracer=NoOpTracer(),
         persistence=SQLiteFlowPersistence(db_path=str(db_path)),
     )
     resumed_flow.kickoff(inputs={"id": run_id})
