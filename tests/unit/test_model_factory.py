@@ -106,3 +106,26 @@ def test_lmstudio_api_key_alias_is_supported(monkeypatch: pytest.MonkeyPatch) ->
     factory = ModelFactory(_build_lmstudio_config())
     llm = factory.create_llm(env={"LM_STUDIO_API_KEY": "token-value"})
     assert llm.kwargs["api_key"] == "token-value"
+
+
+def test_lmstudio_cold_storage_patch_handles_import_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LM Studio setup should patch LiteLLM cold-storage logging import failures."""
+    from litellm.proxy.spend_tracking.cold_storage_handler import ColdStorageHandler
+
+    def _raise_import_error() -> str | None:
+        raise ImportError("proxy extras missing")
+
+    monkeypatch.setattr(model_factory_module, "_LITELLM_COLD_STORAGE_PATCHED", False)
+    monkeypatch.setattr(model_factory_module, "LLM", _FakeLLM)
+    monkeypatch.setattr(
+        ColdStorageHandler,
+        "_get_configured_cold_storage_custom_logger",
+        staticmethod(_raise_import_error),
+    )
+
+    factory = ModelFactory(_build_lmstudio_config())
+    factory.create_llm(env={"LM_STUDIO_AUTH_TOKEN": "token-value"})
+
+    assert ColdStorageHandler._get_configured_cold_storage_custom_logger() is None

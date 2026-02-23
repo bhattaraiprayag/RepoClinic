@@ -27,10 +27,13 @@
 - Pre-commit checks integrated for formatter/lint enforcement.
 - GitHub Actions CI workflow added for pre-commit, formatting, lint, tests, and config validation.
 - Makefile quality/observability targets updated for cloud-first operations.
+- Scanner scope hardening delivered (`tests/fixtures/**` excluded by default) to reduce false-positive tech detection.
+- LM Studio branch execution hardening delivered for noisy LiteLLM proxy-import logging and schema-variance normalization.
 
 ## In-progress priorities
 
-- Improve deterministic branch heuristics for lower false-positive rates.
+- Expand provider/model compatibility matrix testing for LM Studio model behavior consistency.
+- Improve deterministic branch heuristics for lower non-actionable finding rates.
 - Add optional remote persistence backends for multi-run operational history.
 - Extend acceptance fixtures with larger polyglot repositories.
 

@@ -8,7 +8,7 @@ from typing import Any, Protocol, TypeVar
 
 import orjson
 from crewai import Agent, Crew, Process, Task
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from repoclinic.agents.context_compactor import (
     compact_scanner_context,
@@ -528,19 +528,25 @@ class CrewBranchExecutor:
             allow_delegation=False,
             verbose=False,
         )
-        task = Task(
-            description=task_description,
-            expected_output=expected_output,
-            output_pydantic=output_model,
-            agent=agent,
-        )
-        crew = Crew(
-            agents=[agent],
-            tasks=[task],
-            process=Process.sequential,
-            verbose=False,
-        )
-        result: Any = crew.kickoff()
+        result: Any
+        try:
+            result = self._kickoff_task(
+                agent=agent,
+                task_description=task_description,
+                expected_output=expected_output,
+                output_model=output_model,
+                enforce_schema=True,
+            )
+        except Exception as exc:
+            if not _is_schema_validation_error(exc):
+                raise
+            result = self._kickoff_task(
+                agent=agent,
+                task_description=task_description,
+                expected_output=expected_output,
+                output_model=output_model,
+                enforce_schema=False,
+            )
         if getattr(result, "pydantic", None) is not None:
             pydantic_result = result.pydantic
             if isinstance(pydantic_result, output_model):
@@ -552,13 +558,43 @@ class CrewBranchExecutor:
             ):
                 return task_output.pydantic
             if getattr(task_output, "json_dict", None) is not None:
-                return output_model.model_validate(task_output.json_dict)
+                return _validate_output_model_payload(
+                    task_output.json_dict, output_model
+                )
         if getattr(result, "json_dict", None) is not None:
-            return output_model.model_validate(result.json_dict)
+            return _validate_output_model_payload(result.json_dict, output_model)
         raw = getattr(result, "raw", None)
         if raw:
-            return output_model.model_validate_json(raw)
+            try:
+                return output_model.model_validate_json(raw)
+            except ValidationError:
+                return _validate_output_model_payload(orjson.loads(raw), output_model)
         raise ValueError("Crew output did not contain parseable structured data")
+
+    @staticmethod
+    def _kickoff_task(
+        *,
+        agent: Agent,
+        task_description: str,
+        expected_output: str,
+        output_model: type[MODEL_T],
+        enforce_schema: bool,
+    ) -> Any:
+        task_kwargs: dict[str, Any] = {
+            "description": task_description,
+            "expected_output": expected_output,
+            "agent": agent,
+        }
+        if enforce_schema:
+            task_kwargs["output_pydantic"] = output_model
+        task = Task(**task_kwargs)
+        crew = Crew(
+            agents=[agent],
+            tasks=[task],
+            process=Process.sequential,
+            verbose=False,
+        )
+        return crew.kickoff()
 
     def _serialize_context(self, scanner_output: ScannerOutput, budget: int) -> str:
         scanner_payload = scanner_output.model_dump(mode="json")
@@ -778,6 +814,133 @@ def _find_matching_evidence(
         if any(keyword in haystack for keyword in normalized_keywords):
             return evidence
     return None
+
+
+def _validate_output_model_payload(
+    payload: dict[str, Any], output_model: type[MODEL_T]
+) -> MODEL_T:
+    expected_finding_category = _expected_finding_category(output_model)
+    try:
+        return output_model.model_validate(payload)
+    except ValidationError:
+        normalized_payload = _normalize_output_payload(
+            payload, expected_finding_category=expected_finding_category
+        )
+        if normalized_payload == payload:
+            raise
+        return output_model.model_validate(normalized_payload)
+
+
+def _normalize_output_payload(
+    payload: Any, *, expected_finding_category: str | None = None
+) -> Any:
+    if isinstance(payload, dict):
+        normalized: dict[str, Any] = {}
+        for key, value in payload.items():
+            normalized_value = _normalize_output_payload(
+                value, expected_finding_category=expected_finding_category
+            )
+            if key == "severity" and isinstance(normalized_value, str):
+                normalized[key] = _normalize_severity(normalized_value)
+            elif (
+                key == "category"
+                and expected_finding_category is not None
+                and isinstance(normalized_value, str)
+            ):
+                normalized[key] = expected_finding_category
+            elif key == "status" and isinstance(normalized_value, str):
+                normalized[key] = _normalize_finding_status(normalized_value)
+            elif key == "file" and isinstance(normalized_value, str):
+                normalized[key] = _normalize_file_path(normalized_value)
+            elif key in {"line_start", "line_end"}:
+                normalized[key] = _normalize_line_number(normalized_value)
+            elif key == "confidence":
+                normalized[key] = _normalize_confidence(normalized_value)
+            else:
+                normalized[key] = normalized_value
+        return normalized
+    if isinstance(payload, list):
+        return [
+            _normalize_output_payload(
+                item, expected_finding_category=expected_finding_category
+            )
+            for item in payload
+        ]
+    return payload
+
+
+def _normalize_severity(value: str) -> str:
+    normalized = value.strip().lower()
+    severity_map = {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical",
+        "unknown": "Medium",
+        "n/a": "Medium",
+        "na": "Medium",
+        "none": "Medium",
+        "info": "Low",
+        "informational": "Low",
+    }
+    return severity_map.get(normalized, value)
+
+
+def _is_schema_validation_error(exc: Exception) -> bool:
+    if isinstance(exc, ValidationError):
+        return True
+    return "validation error" in str(exc).lower()
+
+
+def _expected_finding_category(output_model: type[MODEL_T]) -> str | None:
+    category_map = {
+        "ArchitectureAgentOutput": "architecture",
+        "SecurityAgentOutput": "security",
+        "PerformanceAgentOutput": "performance",
+    }
+    return category_map.get(output_model.__name__)
+
+
+def _normalize_finding_status(value: str) -> str:
+    normalized = value.strip().lower().replace(" ", "_")
+    status_map = {
+        "confirmed": "confirmed",
+        "suspected": "suspected",
+        "not_applicable": "not_applicable",
+        "n/a": "not_applicable",
+        "na": "not_applicable",
+        "insufficient_evidence": "insufficient_evidence",
+        "insufficient": "insufficient_evidence",
+        "unknown": "suspected",
+        "failed": "failed",
+    }
+    return status_map.get(normalized, value)
+
+
+def _normalize_file_path(value: str) -> str:
+    return value.strip() or "N/A"
+
+
+def _normalize_line_number(value: Any) -> int:
+    if isinstance(value, int):
+        return max(value, 1)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.isdigit():
+            return max(int(stripped), 1)
+    return 1
+
+
+def _normalize_confidence(value: Any) -> float:
+    if isinstance(value, (int, float)):
+        return max(0.0, min(float(value), 1.0))
+    if isinstance(value, str):
+        try:
+            parsed = float(value.strip())
+        except ValueError:
+            return 0.5
+        return max(0.0, min(parsed, 1.0))
+    return 0.5
 
 
 def _build_check_finding(

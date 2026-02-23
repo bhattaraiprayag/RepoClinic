@@ -11,15 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pre-commit integration via `.pre-commit-config.yaml` with Ruff format/lint hooks.
 - GitHub Actions CI workflow (`.github/workflows/ci.yml`) for pre-commit, formatting, lint, tests, and config validation.
 - New Makefile targets: `precommit` and `langfuse-cloud-check`.
+- Branch output normalization helpers for schema-safe handling of provider/model response variance.
 
 ### Changed
 - Langfuse tracing now prioritizes `LANGFUSE_BASE_URL` for cloud-first endpoint selection.
 - Runtime environment examples and tests now use `LANGFUSE_BASE_URL` instead of `LANGFUSE_HOST`.
 - Makefile quality commands now use `uv run ruff` for environment-consistent lint/format behavior.
 - Documentation suite updated for Langfuse Cloud-first observability and CI/pre-commit workflows.
+- Scanner default exclude policy now omits `tests/fixtures/**` to avoid fixture-driven repo-profile false positives.
+- OSV scanner orchestration now prefers explicit lockfile-targeted scanning before recursive fallback.
+- README is now high-level only; setup and troubleshooting steps are centralized in `QUICKSTART.md` to reduce doc duplication.
 
 ### Fixed
 - Removed unused imports that caused baseline Ruff lint failures.
+- LM Studio profile execution now guards LiteLLM cold-storage proxy imports to avoid non-fatal `fastapi` dependency noise loops.
+- Scanner lockfile collection now respects ignore policy so excluded paths do not leak into dependency findings.
 
 ### Removed
 - Local self-hosted Langfuse Makefile lifecycle commands (`langfuse-up`, `langfuse-down`, `langfuse-logs`, `langfuse-env`, `langfuse-keys`).

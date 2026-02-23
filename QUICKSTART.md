@@ -1,5 +1,7 @@
 # Quickstart
 
+This document is the canonical source for setup, execution, and troubleshooting steps.
+
 ## 1) Prerequisites
 
 - Linux/macOS (or WSL2 on Windows)
@@ -89,6 +91,21 @@ uv run repoclinic analyze \
 ```bash
 uv run repoclinic resume --run-id <run-id> --output-dir artifacts/resumed
 ```
+
+### Scanner scope defaults
+
+- `tests/fixtures/**` is excluded by default from scanner profiling to prevent fixture-only technology detection in real repo reports.
+- OSV scanning prefers explicit lockfiles discovered by scanner inventory, then falls back to recursive scan only when needed.
+
+If fixture scanning is intentionally required for a custom run, use a dedicated config override that removes `tests/fixtures/**` from `scan_policy.exclude_globs`.
+
+### LM Studio provider notes
+
+- Use `uv run repoclinic validate-config --config config/settings.yaml` to confirm active model/profile wiring.
+- Ensure `LM_STUDIO_MODEL` points to a chat-capable model ID exposed by your LM Studio `/models` endpoint.
+- Validated chat-model IDs in current local compatibility checks: `qwen/qwen3-vl-30b`, `qwen3-next-80b-a3b-thinking-mlx`, and `qwen/qwen3-coder-next` (model behavior can still vary by prompt/load).
+- If a specific model produces degraded branch output, rerun with a different available LM Studio model.
+- Normal LM Studio usage in RepoClinic does not require running LiteLLM proxy extras.
 
 ## 5) Run repository checks locally (with Makefile)
 
@@ -189,14 +206,29 @@ make langfuse-cloud-check
 
 Then run any `analyze`/`resume` command and verify traces in Langfuse Cloud.
 
-## 9) Quality checks and pre-commit
+## 9) LM Studio troubleshooting quick checks
+
+List available models from your configured LM Studio endpoint:
+
+```bash
+curl -sS "${LM_STUDIO_BASE_URL:-http://127.0.0.1:1234/v1}/models"
+```
+
+Run analysis with an explicit model override for isolation:
+
+```bash
+LM_STUDIO_MODEL=qwen/qwen3-vl-30b \
+uv run repoclinic analyze --path /absolute/path/to/repository --provider-profile lm-studio-default
+```
+
+## 10) Quality checks and pre-commit
 
 ```bash
 uv run pre-commit install
 make precommit
 ```
 
-## 10) Useful utility commands
+## 11) Useful utility commands
 
 ```bash
 make validate-config

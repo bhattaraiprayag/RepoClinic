@@ -124,7 +124,7 @@ def test_normalize_lockfiles_keeps_existing_relative_paths(tmp_path: Path) -> No
 
 
 def test_osv_falls_back_to_lockfile_scan(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
-    """OSV should retry with explicit lockfiles when recursive source scan is unavailable."""
+    """OSV should retry recursive scanning when lockfile-only mode is unavailable."""
     repo = tmp_path / "repo"
     repo.mkdir()
     lockfile = repo / "uv.lock"
@@ -142,7 +142,7 @@ def test_osv_falls_back_to_lockfile_scan(monkeypatch, tmp_path: Path) -> None:  
     ) -> ToolRunResult:
         del self, tool_name, success_codes, unavailable_codes, cwd
         calls.append(cmd)
-        if "-r" in cmd:
+        if "-L" in cmd:
             return ToolRunResult(
                 status="unavailable", payload={}, error="no package sources"
             )
@@ -156,4 +156,5 @@ def test_osv_falls_back_to_lockfile_scan(monkeypatch, tmp_path: Path) -> None:  
 
     assert result.status == "completed"
     assert len(calls) == 2
-    assert "-L" in calls[1]
+    assert "-L" in calls[0]
+    assert "-r" in calls[1]

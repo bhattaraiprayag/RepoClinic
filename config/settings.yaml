@@ -77,5 +77,6 @@ scan_policy:
     - ".venv/**"
     - "__pycache__/**"
     - "vendor/**"
+    - "tests/fixtures/**"
   max_file_size_bytes: 1000000
   max_files: 25000

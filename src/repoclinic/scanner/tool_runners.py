@@ -76,6 +76,28 @@ class ToolRunners:
     def run_osv(
         self, repo_path: Path, *, lockfiles: list[str] | None = None
     ) -> ToolRunResult:
+        lockfile_args = self._normalize_lockfiles(repo_path, lockfiles or [])
+        if lockfile_args:
+            lockfile_cmd = ["osv-scanner", "scan", "source", "--format", "json"]
+            if self.osv_no_ignore:
+                lockfile_cmd.append("--no-ignore")
+            for lockfile in lockfile_args:
+                lockfile_cmd.extend(["-L", lockfile])
+            lockfile_scan = self._run_json_command(
+                tool_name="osv-scanner",
+                cmd=lockfile_cmd,
+                success_codes={0, 1},
+                unavailable_codes={128},
+                cwd=repo_path,
+            )
+            if (
+                lockfile_scan.status == "completed"
+                or not self.osv_fallback_lockfile_scan
+            ):
+                return lockfile_scan
+        else:
+            lockfile_scan = None
+
         cmd = ["osv-scanner", "scan", "source", "-r", ".", "--format", "json"]
         if self.osv_no_ignore:
             cmd.insert(5, "--no-ignore")
@@ -86,43 +108,23 @@ class ToolRunners:
             unavailable_codes={128},
             cwd=repo_path,
         )
-        if (
-            primary.status == "completed"
-            or not self.osv_fallback_lockfile_scan
-            or not lockfiles
-        ):
+        if primary.status == "completed" or lockfile_scan is None:
             return primary
-        lockfile_args = self._normalize_lockfiles(repo_path, lockfiles)
-        if not lockfile_args:
-            return primary
-        fallback_cmd = ["osv-scanner", "scan", "source", "--format", "json"]
-        if self.osv_no_ignore:
-            fallback_cmd.append("--no-ignore")
-        for lockfile in lockfile_args:
-            fallback_cmd.extend(["-L", lockfile])
-        fallback = self._run_json_command(
-            tool_name="osv-scanner",
-            cmd=fallback_cmd,
-            success_codes={0, 1},
-            unavailable_codes={128},
-            cwd=repo_path,
-        )
-        if fallback.status == "completed":
-            return fallback
-        if primary.error and fallback.error:
+
+        if primary.error and lockfile_scan.error:
             status: ToolRunStatus = (
                 "failed"
-                if "failed" in {primary.status, fallback.status}
+                if "failed" in {primary.status, lockfile_scan.status}
                 else "unavailable"
             )
             return ToolRunResult(
                 status=status,
                 payload={},
-                error=f"{primary.error}; fallback: {fallback.error}",
-                exit_code=fallback.exit_code or primary.exit_code,
-                stderr=fallback.stderr or primary.stderr,
+                error=f"{lockfile_scan.error}; fallback: {primary.error}",
+                exit_code=primary.exit_code or lockfile_scan.exit_code,
+                stderr=primary.stderr or lockfile_scan.stderr,
             )
-        return primary
+        return lockfile_scan
 
     def _run_json_command(
         self,

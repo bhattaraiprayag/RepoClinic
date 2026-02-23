@@ -35,3 +35,35 @@ def test_inventory_tracks_encoding_and_size_skips(tmp_path: Path) -> None:
         + result.stats.skipped_reasons.encoding_error
         >= 1
     )
+
+
+def test_excluded_lockfiles_are_not_collected(tmp_path: Path) -> None:
+    """Lockfiles under excluded paths should not be passed to dependency scanning."""
+    (tmp_path / "requirements.txt").write_text("rich==14.0.0", encoding="utf-8")
+    fixture_lockfile = (
+        tmp_path / "tests" / "fixtures" / "sample_repo" / "requirements.txt"
+    )
+    fixture_lockfile.parent.mkdir(parents=True)
+    fixture_lockfile.write_text("fastapi==0.110.0", encoding="utf-8")
+
+    scan_policy = ScanPolicyConfig(
+        exclude_globs=[
+            ".git/**",
+            "node_modules/**",
+            "dist/**",
+            "build/**",
+            ".venv/**",
+            "__pycache__/**",
+            "vendor/**",
+            "tests/fixtures/**",
+        ],
+    )
+    engine = InventoryEngine(IgnorePolicy.from_config(scan_policy), scan_policy)
+
+    result = engine.collect(tmp_path)
+
+    assert Path("requirements.txt") in result.osv_lockfiles
+    assert (
+        Path("tests/fixtures/sample_repo/requirements.txt") not in result.osv_lockfiles
+    )
+    assert result.stats.skipped_reasons.ignored_pathspec >= 1

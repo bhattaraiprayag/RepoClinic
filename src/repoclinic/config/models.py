@@ -136,6 +136,7 @@ class ScanPolicyConfig(StrictSchemaModel):
             ".venv/**",
             "__pycache__/**",
             "vendor/**",
+            "tests/fixtures/**",
         ]
     )
     max_file_size_bytes: int = Field(default=1_000_000, gt=0)

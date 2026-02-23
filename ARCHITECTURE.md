@@ -29,7 +29,7 @@ flowchart TD
 |---|---|
 | `repoclinic.cli` | Operator-facing commands and input validation |
 | `repoclinic.flow` | Flow orchestration, checkpointing, resume logic |
-| `repoclinic.scanner` | Deterministic source resolution, inventory, heuristics, evidence normalization |
+| `repoclinic.scanner` | Deterministic source resolution, scoped inventory, heuristics, evidence normalization, dependency lockfile discovery |
 | `repoclinic.agents` | Branch analyzers and roadmap synthesis |
 | `repoclinic.artifacts` | Deterministic `summary.json` and `report.md` generation |
 | `repoclinic.config` | Typed config loading and provider profile resolution |
@@ -38,7 +38,7 @@ flowchart TD
 ## 3) Flow execution model
 
 1. Validate request payload and provider profile.
-2. Execute scanner stage first (deterministic, bounded by scan policy and timeouts).
+2. Execute scanner stage first (deterministic, bounded by scan policy and timeouts, with fixture paths excluded by default).
 3. Fan out architecture/security/performance branches.
 4. Fan in to roadmap synthesis after branch completion (including degraded outcomes).
 5. Materialize report artifacts and persist metadata.
@@ -102,4 +102,7 @@ erDiagram
 
 - Provider switching is config-driven (`config/settings.yaml` + env overrides).
 - Retry/timeout behavior is centrally configured and applied by flow stages.
+- Scanner scope is policy-driven; `tests/fixtures/**` is excluded by default to prevent fixture-only technology bleed-through in repo profiling.
+- OSV dependency scanning runs lockfile-targeted mode first and falls back to recursive scanning only when lockfile mode is unavailable.
+- LM-driven branch outputs are normalized before strict schema validation to handle provider/model output variance.
 - Branch execution can run through CrewAI-backed models or deterministic heuristic mode.

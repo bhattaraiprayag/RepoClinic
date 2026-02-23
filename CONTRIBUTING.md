@@ -19,6 +19,11 @@ uv run pre-commit install
 - Keep changes atomic and cohesive.
 - Maintain type safety and deterministic behavior.
 - Update `CHANGELOG.md` for user-visible behavior changes.
+- Keep documentation non-redundant:
+  - `README.md`: high-level overview only
+  - `QUICKSTART.md`: setup and troubleshooting runbooks
+  - `ARCHITECTURE.md`: design/runtime model
+  - `ROADMAP.md`: planning and sequencing state
 
 ## Commit convention
 
@@ -41,6 +46,7 @@ Supported `type` values:
 make check
 make precommit
 make validate-config
+uv run pre-commit run --all-files
 ```
 
 GitHub Actions CI (`.github/workflows/ci.yml`) runs the same quality gates on push and pull requests.

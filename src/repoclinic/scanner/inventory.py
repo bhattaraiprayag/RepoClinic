@@ -84,12 +84,12 @@ class InventoryEngine:
             if len(records) >= self.scan_policy.max_files:
                 break
             stats.total_files_seen += 1
-            if rel.name in OSV_LOCKFILE_FILES:
-                lockfiles.add(rel)
             if self.policy.should_skip(rel):
                 stats.files_skipped += 1
                 stats.skipped_reasons.ignored_pathspec += 1
                 continue
+            if rel.name in OSV_LOCKFILE_FILES:
+                lockfiles.add(rel)
 
             full_path = repo_path / rel
             try:

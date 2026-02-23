@@ -7,31 +7,13 @@ RepoClinic is a scanner-first repository analysis CLI built with CrewAI flow orc
 
 ## Setup
 
-### Prerequisites
+Use [QUICKSTART.md](QUICKSTART.md) for canonical setup, tool installation, Docker usage, and troubleshooting guidance.
 
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/)
-- Git
-- [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`)
-- [Go](https://go.dev/doc/install) 1.25.7+ (required when installing `osv-scanner` from source)
-- Docker (optional, for containerized runs)
-
-### Install and bootstrap
+If the environment is already prepared:
 
 ```bash
-uv venv
-source .venv/bin/activate
 uv sync
-go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
 cp .env.example .env
-```
-
-Verify scanner tooling is present:
-
-```bash
-semgrep --version
-bandit --version
-osv-scanner --version
 ```
 
 ## How to run
@@ -61,6 +43,13 @@ RepoClinic follows a scanner-first dependency chain:
 5. **Roadmap Planner Agent** (CrewAI-first with deterministic fallback)
 
 The scanner stage executes first, architecture/security/performance depend on scanner output, and roadmap synthesis runs after all three complete.
+
+## Reliability updates in current release
+
+- Scanner scope now excludes `tests/fixtures/**` by default to avoid fixture-driven repo-profile false positives.
+- Dependency vulnerability scanning now prioritizes explicit lockfile targets before recursive fallback scanning.
+- LM Studio provider setup now guards LiteLLM cold-storage proxy imports to avoid noisy non-fatal `fastapi` dependency logs.
+- Crew branch outputs are normalized before schema validation to improve resilience across LM Studio model output variance.
 
 ## Known limitations
 

@@ -9,6 +9,8 @@ from crewai import LLM
 from repoclinic.config.models import AppConfig, ProviderProfile
 from repoclinic.schemas.enums import ProviderType
 
+_LITELLM_COLD_STORAGE_PATCHED = False
+
 
 class ModelFactory:
     """Factory for provider-specific CrewAI LLM clients."""
@@ -56,6 +58,7 @@ class ModelFactory:
                 raise ValueError(
                     f"Missing LM Studio auth env var: {profile.api_key_env} (or LM_STUDIO_API_KEY)"
                 )
+            _patch_litellm_cold_storage_handler()
             base_url = _normalize_lmstudio_base_url(base_url)
             model_name = _normalize_lmstudio_model(profile.model)
 
@@ -68,6 +71,32 @@ class ModelFactory:
             api_key=api_key,
             base_url=base_url,
         )
+
+
+def _patch_litellm_cold_storage_handler() -> None:
+    """Guard LiteLLM cold-storage logging against proxy-only import errors."""
+    global _LITELLM_COLD_STORAGE_PATCHED
+    if _LITELLM_COLD_STORAGE_PATCHED:
+        return
+    try:
+        from litellm.proxy.spend_tracking.cold_storage_handler import ColdStorageHandler
+    except ImportError:
+        return
+
+    original = ColdStorageHandler._get_configured_cold_storage_custom_logger
+
+    def _safe_get_configured_cold_storage_custom_logger() -> str | None:
+        try:
+            return original()
+        except ImportError:
+            return None
+
+    setattr(
+        ColdStorageHandler,
+        "_get_configured_cold_storage_custom_logger",
+        staticmethod(_safe_get_configured_cold_storage_custom_logger),
+    )
+    _LITELLM_COLD_STORAGE_PATCHED = True
 
 
 def _normalize_lmstudio_base_url(base_url: str) -> str:
