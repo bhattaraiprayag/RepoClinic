@@ -25,7 +25,7 @@ uv run repoclinic analyze --repo https://github.com/owner/repo --output-dir arti
 uv run repoclinic analyze --path /absolute/path/to/repo --output-dir artifacts
 ```
 
-### Requirement-compatible root entrypoint
+### Use root entrypoint
 
 ```bash
 python main.py --repo https://github.com/owner/repo
